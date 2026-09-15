@@ -11,6 +11,13 @@ class HolidayRepository {
 
   Future<List<Holiday>> getAll() => _db.select(_db.holidays).get();
 
+  /// Reactivo, mismo patrón que `PropertyRepository.watchActive()`: la
+  /// pantalla de Configuración se actualiza sola al agregar/quitar un
+  /// feriado, sin invalidar nada a mano.
+  Stream<List<Holiday>> watchAll() => (_db.select(
+    _db.holidays,
+  )..orderBy([(h) => OrderingTerm.asc(h.date)])).watch();
+
   Future<String> add({required DateTime date, String? name}) async {
     final id = const Uuid().v4();
     await _db

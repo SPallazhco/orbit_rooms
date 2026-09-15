@@ -3,31 +3,50 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:orbit_rooms/core/database/app_database.dart';
 import 'package:orbit_rooms/features/rooms/rooms_providers.dart';
 
+/// Mismo formulario para crear y editar (PRD 5.2, "CRUD de habitaciones"):
+/// la única diferencia es que [initial] ya trae los datos cargados.
 class AddRoomDialog extends ConsumerStatefulWidget {
-  const AddRoomDialog({super.key, required this.properties});
+  const AddRoomDialog({super.key, required this.properties, this.initial});
 
   final List<Property> properties;
+  final Room? initial;
 
   @override
   ConsumerState<AddRoomDialog> createState() => _AddRoomDialogState();
 }
 
 class _AddRoomDialogState extends ConsumerState<AddRoomDialog> {
-  final _nameController = TextEditingController();
-  final _capacityController = TextEditingController();
-  final _weekdayController = TextEditingController();
-  final _weekendController = TextEditingController();
-  final _holidayController = TextEditingController();
+  late final _nameController = TextEditingController(
+    text: widget.initial?.name,
+  );
+  late final _capacityController = TextEditingController(
+    text: widget.initial?.capacity.toString(),
+  );
+  late final _weekdayController = TextEditingController(
+    text: _decimalFrom(widget.initial?.ratePerPersonWeekdayCents),
+  );
+  late final _weekendController = TextEditingController(
+    text: _decimalFrom(widget.initial?.ratePerPersonWeekendCents),
+  );
+  late final _holidayController = TextEditingController(
+    text: _decimalFrom(widget.initial?.ratePerPersonHolidayCents),
+  );
 
   String? _propertyId;
   List<RoomType> _roomTypes = [];
   String? _roomTypeId;
   bool _loadingTypes = true;
 
+  static String? _decimalFrom(int? cents) =>
+      cents == null ? null : (cents / 100).toStringAsFixed(2);
+
   @override
   void initState() {
     super.initState();
-    _propertyId = widget.properties.isEmpty ? null : widget.properties.first.id;
+    _propertyId =
+        widget.initial?.propertyId ??
+        (widget.properties.isEmpty ? null : widget.properties.first.id);
+    _roomTypeId = widget.initial?.roomTypeId;
     _loadRoomTypes();
   }
 
@@ -100,9 +119,21 @@ class _AddRoomDialogState extends ConsumerState<AddRoomDialog> {
       return;
     }
 
-    await ref
-        .read(roomRepositoryProvider)
-        .create(
+    final repository = ref.read(roomRepositoryProvider);
+    final initial = widget.initial;
+    if (initial == null) {
+      await repository.create(
+        propertyId: propertyId,
+        roomTypeId: roomTypeId,
+        name: name,
+        capacity: capacity,
+        ratePerPersonWeekdayCents: _centsFrom(_weekdayController.text),
+        ratePerPersonWeekendCents: _centsFrom(_weekendController.text),
+        ratePerPersonHolidayCents: _centsFrom(_holidayController.text),
+      );
+    } else {
+      await repository.update(
+        initial.copyWith(
           propertyId: propertyId,
           roomTypeId: roomTypeId,
           name: name,
@@ -110,7 +141,9 @@ class _AddRoomDialogState extends ConsumerState<AddRoomDialog> {
           ratePerPersonWeekdayCents: _centsFrom(_weekdayController.text),
           ratePerPersonWeekendCents: _centsFrom(_weekendController.text),
           ratePerPersonHolidayCents: _centsFrom(_holidayController.text),
-        );
+        ),
+      );
+    }
 
     if (mounted) Navigator.of(context).pop();
   }
@@ -118,7 +151,9 @@ class _AddRoomDialogState extends ConsumerState<AddRoomDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Nueva habitación'),
+      title: Text(
+        widget.initial == null ? 'Nueva habitación' : 'Editar habitación',
+      ),
       content: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,

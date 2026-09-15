@@ -122,4 +122,30 @@ void main() {
     expect(finalDetail.vehicles.single.plate, 'ABC123');
     expect(finalDetail.reservation.notes, 'Desayuno a las 7');
   });
+
+  test('reservationsForGuestProvider refleja el historial de ese huésped y se '
+      'actualiza solo al crear una reserva', () async {
+    container.listen(reservationsForGuestProvider(guestId), (_, _) {});
+    await Future<void>.delayed(Duration.zero);
+    expect(
+      container.read(reservationsForGuestProvider(guestId)).value,
+      isEmpty,
+    );
+
+    await container
+        .read(createReservationUseCaseProvider)
+        .call(
+          guestId: guestId,
+          checkInDate: DateTime(2026, 6, 1),
+          checkOutDate: DateTime(2026, 6, 3),
+          roomAssignments: [
+            RoomAssignmentInput(roomId: roomId, guestsCount: 2),
+          ],
+        );
+    await Future<void>.delayed(Duration.zero);
+
+    final history = container.read(reservationsForGuestProvider(guestId)).value;
+    expect(history, hasLength(1));
+    expect(history!.single.guestId, guestId);
+  });
 }

@@ -6,4 +6,5 @@ class RoutesNames {
   static const String reservations = "/reservations";
   static const String calendar = "/calendar";
   static const String reports = "/reports";
+  static const String settings = "/settings";
 }

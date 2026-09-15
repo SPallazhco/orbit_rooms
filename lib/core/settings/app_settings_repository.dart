@@ -17,6 +17,13 @@ class AppSettingsRepository {
     return row?.currency ?? 'USD';
   }
 
+  /// Reactivo, mismo patrón que `HolidayRepository.watchAll()`: la
+  /// pantalla de Configuración refleja sola un cambio de moneda.
+  Stream<String> watchCurrency() =>
+      (_db.select(_db.appSettings)..where((s) => s.id.equals(_settingsId)))
+          .watchSingleOrNull()
+          .map((row) => row?.currency ?? 'USD');
+
   Future<void> setCurrency(String currencyCode) => _db
       .into(_db.appSettings)
       .insertOnConflictUpdate(

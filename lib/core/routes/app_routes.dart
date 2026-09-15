@@ -7,6 +7,7 @@ import 'package:orbit_rooms/features/properties/presentation/pages/properties_pa
 import 'package:orbit_rooms/features/reports/presentation/pages/reports_page.dart';
 import 'package:orbit_rooms/features/reservations/presentation/pages/reservations_page.dart';
 import 'package:orbit_rooms/features/rooms/presentation/pages/rooms_page.dart';
+import 'package:orbit_rooms/features/settings/presentation/pages/settings_page.dart';
 
 class AppRoutes {
   static Map<String, WidgetBuilder> routes = {
@@ -17,5 +18,6 @@ class AppRoutes {
     RoutesNames.reservations: (_) => const ReservationsPage(),
     RoutesNames.calendar: (_) => const CalendarPage(),
     RoutesNames.reports: (_) => const ReportsPage(),
+    RoutesNames.settings: (_) => const SettingsPage(),
   };
 }

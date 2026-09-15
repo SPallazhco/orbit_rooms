@@ -43,6 +43,7 @@ class RoomsPage extends ConsumerWidget {
                   ListTile(
                     title: Text(room.name),
                     subtitle: Text('Capacidad orientativa: ${room.capacity}'),
+                    onTap: () => _editRoom(context, ref, room),
                     trailing: IconButton(
                       icon: const Icon(Icons.delete_outline),
                       onPressed: () =>
@@ -78,6 +79,16 @@ class RoomsPage extends ConsumerWidget {
     await showDialog<void>(
       context: context,
       builder: (_) => AddRoomDialog(properties: properties),
+    );
+  }
+
+  Future<void> _editRoom(BuildContext context, WidgetRef ref, Room room) async {
+    final properties = await ref.read(propertyRepositoryProvider).getActive();
+    if (!context.mounted) return;
+
+    await showDialog<void>(
+      context: context,
+      builder: (_) => AddRoomDialog(properties: properties, initial: room),
     );
   }
 }

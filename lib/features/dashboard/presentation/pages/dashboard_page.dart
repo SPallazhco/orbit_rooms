@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:orbit_rooms/core/settings/settings_providers.dart';
 import 'package:orbit_rooms/features/dashboard/dashboard_providers.dart';
 import 'package:orbit_rooms/features/reservations/presentation/pages/reservation_detail_page.dart';
+import 'package:orbit_rooms/shared/utils/format_money.dart';
 import 'package:orbit_rooms/shared/widgets/app_drawer.dart';
-
-String _formatCents(int cents) => (cents / 100).toStringAsFixed(2);
 
 class DashboardPage extends ConsumerWidget {
   const DashboardPage({super.key});
@@ -12,6 +12,7 @@ class DashboardPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final dataAsync = ref.watch(dashboardDataProvider);
+    final currency = ref.watch(currencyProvider).value ?? 'USD';
 
     return Scaffold(
       appBar: AppBar(title: const Text("OrbitRooms")),
@@ -69,12 +70,12 @@ class DashboardPage extends ConsumerWidget {
             ListTile(
               contentPadding: EdgeInsets.zero,
               title: const Text('Hoy'),
-              trailing: Text(_formatCents(data.incomeTodayCents)),
+              trailing: Text(formatCents(data.incomeTodayCents, currency)),
             ),
             ListTile(
               contentPadding: EdgeInsets.zero,
               title: const Text('Este mes'),
-              trailing: Text(_formatCents(data.incomeMonthCents)),
+              trailing: Text(formatCents(data.incomeMonthCents, currency)),
             ),
           ],
         ),

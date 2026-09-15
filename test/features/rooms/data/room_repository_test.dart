@@ -65,4 +65,38 @@ void main() {
       expect(emissions, [0, 1, 0]);
     },
   );
+
+  test('update reemplaza los campos (ej. tarifa) y watchAllActive refleja el '
+      'cambio solo', () async {
+    final roomId = await repository.create(
+      propertyId: propertyId,
+      roomTypeId: roomTypeId,
+      name: 'Cuarto 1',
+      capacity: 4,
+      ratePerPersonWeekdayCents: 1200,
+      ratePerPersonWeekendCents: 1500,
+      ratePerPersonHolidayCents: 2000,
+    );
+
+    final emissions = <int>[];
+    final subscription = repository.watchAllActive().listen(
+      (rooms) => emissions.add(rooms.single.room.ratePerPersonWeekdayCents),
+    );
+    addTearDown(subscription.cancel);
+    await Future<void>.delayed(Duration.zero);
+
+    final current = await repository.getById(roomId);
+    await repository.update(
+      current.copyWith(
+        name: 'Cuarto 1 Renovado',
+        ratePerPersonWeekdayCents: 1400,
+      ),
+    );
+    await Future<void>.delayed(Duration.zero);
+
+    final updated = await repository.getById(roomId);
+    expect(updated.name, 'Cuarto 1 Renovado');
+    expect(updated.ratePerPersonWeekdayCents, 1400);
+    expect(emissions.last, 1400);
+  });
 }

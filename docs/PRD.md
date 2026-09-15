@@ -91,7 +91,7 @@ Reservation (1) ── (N) Payment
 
 Los módulos coinciden con las features ya creadas en `lib/features/`.
 
-### 5.1 Properties
+### 5.1 Properties ✅ implementado
 
 - Crear, editar, listar y desactivar propiedades.
 - Cada propiedad tiene: nombre, dirección, y opcionalmente `ownerName` /
@@ -101,10 +101,15 @@ Los módulos coinciden con las features ya creadas en `lib/features/`.
   eso.
 - Permitir marcar una propiedad como la "principal" del usuario (informativo,
   no cambia permisos porque no hay roles todavía).
+- Un mismo formulario (`AddPropertyDialog`) sirve para crear y editar — se
+  toca una propiedad de la lista para abrirlo con sus datos cargados.
 
-### 5.2 Rooms
+### 5.2 Rooms ✅ implementado
 
-- CRUD de habitaciones, siempre asociadas a una propiedad.
+- CRUD de habitaciones, siempre asociadas a una propiedad. Un mismo
+  formulario (`AddRoomDialog`) sirve para crear y editar — se toca una
+  habitación de la lista para abrirlo con sus datos cargados (propiedad,
+  tipo, nombre, capacidad y las 3 tarifas).
 - Campos: número/nombre, `RoomType` (elegido de los tipos ya creados por el
   usuario o uno nuevo creado al vuelo — no es una lista fija de la app),
   capacidad, estado (activa/inactiva).
@@ -123,11 +128,18 @@ Los módulos coinciden con las features ya creadas en `lib/features/`.
   [DECISIONS.md](DECISIONS.md); revisado a partir de un caso real — antes
   eran solo dos tarifas).
 
-### 5.3 Guests
+### 5.3 Guests ✅ implementado
 
 - CRUD de huéspedes: nombre, documento de identidad, teléfono, email
-  (opcional), notas.
-- Ver historial de reservas de un huésped (búsqueda por nombre/documento).
+  (opcional), notas. Un mismo formulario (`AddGuestDialog`) sirve para
+  crear y editar.
+- Ver historial de reservas de un huésped: tocar un huésped en la lista
+  (búsqueda por nombre/documento) abre `GuestDetailPage`, con sus datos y
+  la lista de todas sus reservas (más recientes primero, con fechas,
+  estado y precio), tocable para ir al detalle de cada una. Editar el
+  huésped se hace desde ahí (ícono junto al nombre), no desde la lista —
+  a diferencia de `Property`/`Room`, que no tienen un "detalle" propio y
+  se editan directo al tocarlas en su lista.
 
 ### 5.4 Reservations
 
@@ -225,17 +237,20 @@ repartido en 2-3 habitaciones según capacidad disponible).
   Flutter; por defecto, el mes en curso (día 1 hasta hoy). Ver
   [DECISIONS.md](DECISIONS.md).
 
-### 5.9 Configuración general
+### 5.9 Configuración general ✅ implementado
 
 - Un único valor de **moneda**, fijo para toda la instalación (aplica a
   tarifas de `Room`, precios de `Reservation` y montos de `Payment`). No hay
   conversión de moneda ni moneda por propiedad (ver
-  [DECISIONS.md](DECISIONS.md)).
+  [DECISIONS.md](DECISIONS.md)). Editable desde `SettingsPage` (código de
+  moneda en texto libre, ej. "USD", "COP"); se refleja en todos los montos
+  mostrados en Dashboard, Reportes, Reservas y Detalle de reserva.
 - **Feriados (`Holiday`):** lista de fechas cargadas a mano por la
   administradora (fecha + nombre opcional, ej. "Independencia de Cuenca").
   Sin integración a un calendario de feriados externo — se agregan y quitan
-  manualmente. Afectan el precio de cualquier habitación de cualquier
-  propiedad ese día (ver sección 5.2/5.4 y [DECISIONS.md](DECISIONS.md)).
+  manualmente desde `SettingsPage`. Afectan el precio de cualquier
+  habitación de cualquier propiedad ese día (ver sección 5.2/5.4 y
+  [DECISIONS.md](DECISIONS.md)).
 
 ### 5.10 Horarios de check-in / check-out
 

@@ -1,21 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:orbit_rooms/core/database/app_database.dart';
+import 'package:orbit_rooms/core/settings/settings_providers.dart';
 import 'package:orbit_rooms/features/reservations/presentation/widgets/add_payment_dialog.dart';
 import 'package:orbit_rooms/features/reservations/presentation/widgets/add_vehicle_dialog.dart';
 import 'package:orbit_rooms/features/reservations/presentation/widgets/edit_notes_dialog.dart';
 import 'package:orbit_rooms/features/reservations/presentation/widgets/edit_price_dialog.dart';
 import 'package:orbit_rooms/features/reservations/reservations_providers.dart';
-
-String _formatCents(int cents) => (cents / 100).toStringAsFixed(2);
-
-String _statusLabel(ReservationStatus status) => switch (status) {
-  ReservationStatus.pending => 'Pendiente',
-  ReservationStatus.confirmed => 'Confirmada',
-  ReservationStatus.checkedIn => 'Check-in hecho',
-  ReservationStatus.checkedOut => 'Check-out hecho',
-  ReservationStatus.cancelled => 'Cancelada',
-};
+import 'package:orbit_rooms/shared/utils/format_money.dart';
+import 'package:orbit_rooms/shared/utils/reservation_status_label.dart';
 
 class ReservationDetailPage extends ConsumerWidget {
   const ReservationDetailPage({super.key, required this.reservationId});
@@ -25,6 +18,7 @@ class ReservationDetailPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final detailAsync = ref.watch(reservationDetailProvider(reservationId));
+    final currency = ref.watch(currencyProvider).value ?? 'USD';
 
     return Scaffold(
       appBar: AppBar(title: const Text('Detalle de reserva')),
@@ -51,7 +45,7 @@ class ReservationDetailPage extends ConsumerWidget {
                   .map(
                     (status) => DropdownMenuItem(
                       value: status,
-                      child: Text(_statusLabel(status)),
+                      child: Text(reservationStatusLabel(status)),
                     ),
                   )
                   .toList(),
@@ -73,7 +67,9 @@ class ReservationDetailPage extends ConsumerWidget {
                 contentPadding: EdgeInsets.zero,
                 title: Text(assignment.room.name),
                 subtitle: Text('${assignment.line.guestsCount} personas'),
-                trailing: Text(_formatCents(assignment.line.subtotalCents)),
+                trailing: Text(
+                  formatCents(assignment.line.subtotalCents, currency),
+                ),
               ),
             const Divider(height: 32),
             Text(
@@ -117,7 +113,9 @@ class ReservationDetailPage extends ConsumerWidget {
                 ),
                 Row(
                   children: [
-                    Text(_formatCents(detail.reservation.totalPriceCents)),
+                    Text(
+                      formatCents(detail.reservation.totalPriceCents, currency),
+                    ),
                     IconButton(
                       icon: const Icon(Icons.edit_outlined),
                       onPressed: () => _editPrice(context, ref, detail),
@@ -131,7 +129,7 @@ class ReservationDetailPage extends ConsumerWidget {
             for (final payment in detail.payments)
               ListTile(
                 contentPadding: EdgeInsets.zero,
-                title: Text(_formatCents(payment.amountCents)),
+                title: Text(formatCents(payment.amountCents, currency)),
                 subtitle: Text(_methodLabel(payment.method)),
               ),
             const SizedBox(height: 8),
@@ -142,7 +140,7 @@ class ReservationDetailPage extends ConsumerWidget {
                   'Saldo pendiente',
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
-                Text(_formatCents(detail.balanceCents)),
+                Text(formatCents(detail.balanceCents, currency)),
               ],
             ),
             const SizedBox(height: 16),

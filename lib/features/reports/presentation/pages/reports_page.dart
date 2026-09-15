@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:orbit_rooms/core/settings/settings_providers.dart';
 import 'package:orbit_rooms/features/reports/reports_providers.dart';
+import 'package:orbit_rooms/shared/utils/format_money.dart';
 import 'package:orbit_rooms/shared/widgets/app_drawer.dart';
-
-String _formatCents(int cents) => (cents / 100).toStringAsFixed(2);
 
 String _formatDate(DateTime d) =>
     '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
@@ -26,6 +26,7 @@ class _ReportsPageState extends ConsumerState<ReportsPage> {
   @override
   Widget build(BuildContext context) {
     final reportAsync = ref.watch(reportDataProvider(_range));
+    final currency = ref.watch(currencyProvider).value ?? 'USD';
 
     return Scaffold(
       appBar: AppBar(title: const Text('Reportes')),
@@ -76,7 +77,7 @@ class _ReportsPageState extends ConsumerState<ReportsPage> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    _formatCents(report.incomeCents),
+                    formatCents(report.incomeCents, currency),
                     style: Theme.of(context).textTheme.headlineSmall,
                   ),
                 ],

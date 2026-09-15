@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:orbit_rooms/features/guests/guests_providers.dart';
+import 'package:orbit_rooms/features/guests/presentation/pages/guest_detail_page.dart';
 import 'package:orbit_rooms/features/guests/presentation/widgets/add_guest_dialog.dart';
 import 'package:orbit_rooms/shared/widgets/app_drawer.dart';
 
@@ -69,6 +70,11 @@ class _GuestsPageState extends ConsumerState<GuestsPage> {
                       subtitle: guest.documentId == null
                           ? null
                           : Text(guest.documentId!),
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => GuestDetailPage(guestId: guest.id),
+                        ),
+                      ),
                       trailing: IconButton(
                         icon: const Icon(Icons.delete_outline),
                         onPressed: () => _deleteGuest(context, guest.id),

@@ -45,6 +45,11 @@ class AppDrawer extends StatelessWidget {
             title: const Text("Reportes"),
             onTap: () => Navigator.pushNamed(context, RoutesNames.reports),
           ),
+          ListTile(
+            leading: const Icon(Icons.settings_outlined),
+            title: const Text("Configuración"),
+            onTap: () => Navigator.pushNamed(context, RoutesNames.settings),
+          ),
         ],
       ),
     );

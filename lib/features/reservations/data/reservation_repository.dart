@@ -176,6 +176,14 @@ class ReservationRepository {
     );
   }
 
+  /// Historial de reservas de un huésped puntual (PRD 5.3), más recientes
+  /// primero. Reactivo, mismo patrón que [watchAll].
+  Stream<List<Reservation>> watchByGuest(String guestId) =>
+      (_db.select(_db.reservations)
+            ..where((r) => r.guestId.equals(guestId))
+            ..orderBy([(r) => OrderingTerm.desc(r.checkInDate)]))
+          .watch();
+
   /// Todas las líneas de habitación asignada, con las fechas/estado de su
   /// reserva — para calcular la ocupación actual en el Dashboard (PRD 5.7).
   /// Reactivo, mismo patrón que [watchAll].

@@ -103,4 +103,54 @@ void main() {
 
     expect(emissions, [0, 1]);
   });
+
+  test('watchByGuest solo trae las reservas de ese huésped, más recientes '
+      'primero, y se actualiza solo al crear una nueva', () async {
+    final otherGuestId = const Uuid().v4();
+    await db
+        .into(db.guests)
+        .insert(
+          GuestsCompanion.insert(
+            id: Value(otherGuestId),
+            fullName: 'Luis Torres',
+          ),
+        );
+
+    await repository.createGroupReservation(
+      guestId: otherGuestId,
+      checkInDate: DateTime(2026, 5, 1),
+      checkOutDate: DateTime(2026, 5, 3),
+      roomAssignments: [RoomAssignmentInput(roomId: roomId, guestsCount: 1)],
+    );
+
+    final emissions = <int>[];
+    final subscription = repository
+        .watchByGuest(guestId)
+        .listen((reservations) => emissions.add(reservations.length));
+    addTearDown(subscription.cancel);
+    await Future<void>.delayed(Duration.zero);
+
+    await repository.createGroupReservation(
+      guestId: guestId,
+      checkInDate: DateTime(2026, 6, 1),
+      checkOutDate: DateTime(2026, 6, 3),
+      roomAssignments: [RoomAssignmentInput(roomId: roomId, guestsCount: 2)],
+    );
+    await Future<void>.delayed(Duration.zero);
+
+    await repository.createGroupReservation(
+      guestId: guestId,
+      checkInDate: DateTime(2026, 7, 1),
+      checkOutDate: DateTime(2026, 7, 3),
+      roomAssignments: [RoomAssignmentInput(roomId: roomId, guestsCount: 2)],
+    );
+    await Future<void>.delayed(Duration.zero);
+
+    final history = await repository.watchByGuest(guestId).first;
+    expect(history, hasLength(2));
+    expect(history.first.checkInDate, DateTime(2026, 7, 1));
+    expect(history.last.checkInDate, DateTime(2026, 6, 1));
+
+    expect(emissions, [0, 1, 2]);
+  });
 }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:orbit_rooms/core/database/app_database.dart';
 
 typedef NewGuestData = ({
   String fullName,
@@ -8,19 +9,34 @@ typedef NewGuestData = ({
   String? notes,
 });
 
+/// Mismo formulario para crear y editar (PRD 5.3, "CRUD de huéspedes"): la
+/// única diferencia es que [initial] ya trae los datos cargados. Quien
+/// llama al diálogo decide si el resultado va a `create()` o `update()`.
 class AddGuestDialog extends StatefulWidget {
-  const AddGuestDialog({super.key});
+  const AddGuestDialog({super.key, this.initial});
+
+  final Guest? initial;
 
   @override
   State<AddGuestDialog> createState() => _AddGuestDialogState();
 }
 
 class _AddGuestDialogState extends State<AddGuestDialog> {
-  final _fullNameController = TextEditingController();
-  final _documentIdController = TextEditingController();
-  final _phoneController = TextEditingController();
-  final _emailController = TextEditingController();
-  final _notesController = TextEditingController();
+  late final _fullNameController = TextEditingController(
+    text: widget.initial?.fullName,
+  );
+  late final _documentIdController = TextEditingController(
+    text: widget.initial?.documentId,
+  );
+  late final _phoneController = TextEditingController(
+    text: widget.initial?.phone,
+  );
+  late final _emailController = TextEditingController(
+    text: widget.initial?.email,
+  );
+  late final _notesController = TextEditingController(
+    text: widget.initial?.notes,
+  );
 
   @override
   void dispose() {
@@ -53,7 +69,7 @@ class _AddGuestDialogState extends State<AddGuestDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Nuevo huésped'),
+      title: Text(widget.initial == null ? 'Nuevo huésped' : 'Editar huésped'),
       content: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,

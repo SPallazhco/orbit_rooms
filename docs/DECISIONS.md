@@ -1170,3 +1170,189 @@ correctamente 0/60 (0.0%) y $0.00.
 **Estado:** vigente. Con esto, las 7 features del scaffold original tienen
 UI real conectada a datos reales — no queda ningún placeholder pendiente
 del roadmap original.
+
+---
+
+## 2026-05-22 — Configuración (PRD 5.9): feriados y moneda, la feature que quedó "invisible"
+
+**Contexto:** al hacer un alto para revisar qué faltaba, encontramos que
+`AppSettingsRepository` y `HolidayRepository` existían completos desde
+hacía sesiones (con tests), pero **no había ninguna pantalla que los
+usara**. Consecuencia real: la tarifa de feriado (`ratePerPersonHoliday`),
+agregada a partir del caso de Hospedaje Shejiná, era literalmente
+inalcanzable para la administradora — no había forma de cargar una fecha
+en `Holiday` desde la app. Y la moneda no se mostraba en ningún lado: todos
+los montos aparecían como `24.00` a secas.
+
+**Decisión de arquitectura — reactivo, no `FutureProvider` + invalidate:**
+a diferencia de `reservationDetailProvider` (una foto que se abre de nuevo
+cada vez), la pantalla de Configuración queda abierta mientras la
+administradora agrega/quita varios feriados seguidos, igual que
+`GuestsPage`/`PropertiesPage`. Se agregó `HolidayRepository.watchAll()`
+(ordenado por fecha) y `AppSettingsRepository.watchCurrency()`
+(`.watchSingleOrNull()` de Drift sobre la única fila de `AppSettings`), y
+sus `StreamProvider`s (`holidaysProvider`, `currencyProvider`) en el
+`core/settings/settings_providers.dart` que ya existía — mismo patrón
+`watchX()` + `StreamProvider` de siempre.
+
+**Decisión de UI — editar moneda es un diálogo, no un campo persistente en
+la página:** un `TextField` inline en una página que se reconstruye por
+streams corre el riesgo de perder lo que el usuario está escribiendo a
+mitad de tipeo (el valor reactivo pisaría el texto local). Se usó el mismo
+mecanismo que `EditPriceDialog`/`EditNotesDialog`: un diálogo que recibe el
+valor actual una sola vez y devuelve el nuevo con `Navigator.pop`.
+
+**Decisión — código de moneda en texto libre, sin dropdown curado:** no
+existe una lista cerrada de monedas en el PRD, y la app no hace ninguna
+conversión ni formato específico por moneda (símbolo, decimales) — armar y
+mantener un catálogo de monedas LATAM habría sido una pieza que nadie pidió
+("no agregar porque toca"). Un `TextField` que guarda el código tal cual
+(mayúsculas) alcanza para lo que la app realmente usa: mostrarlo como
+sufijo del monto.
+
+**Refactor justificado — `formatCents(cents, currency)` centralizado en
+`shared/utils/format_money.dart`:** antes había 3 copias casi idénticas de
+`String _formatCents(int cents) => (cents/100).toStringAsFixed(2)` (en
+`dashboard_page.dart`, `reports_page.dart`,
+`reservation_detail_page.dart`) más un cuarto lugar sin ni siquiera esa
+función (`reservations_page.dart` llamaba `toStringAsFixed(2)` inline). Al
+tener que inyectar la moneda real en las cuatro, se consolidó en una sola
+función compartida en vez de repetir el cambio 4 veces — no es una
+abstracción nueva "por si acaso", es eliminar una duplicación real que ya
+existía y que ahora había que tocar de todos modos. `EditPriceDialog` no se
+tocó: ahí el número es de un campo editable que hay que poder parsear de
+vuelta a centavos, no un valor de solo lectura.
+
+**Verificación:** tests de contenedor Riverpod
+([settings_providers_test.dart](../test/core/settings/settings_providers_test.dart))
+para `currencyProvider` (default `USD`, se actualiza tras `setCurrency`) y
+`holidaysProvider` (se actualiza al agregar/quitar, queda ordenado por
+fecha). Probado a mano en simulador de punta a punta: agregar un feriado
+("Feriado de prueba") lo reflejó solo en la lista sin recargar nada,
+borrarlo lo quitó igual de solo, y los 4 lugares que muestran dinero
+(Dashboard, Reportes, Reservas, Detalle de reserva) ya muestran el sufijo
+de moneda (`169.00 USD`, `24.00 USD`, etc.) en vez del número a secas. La
+edición de moneda vía diálogo se validó por el test de contenedor (cambiar
+a `COP` y ver `currencyProvider` reflejarlo) — la edición manual en
+simulador quedó parcialmente probada (el menú nativo de selección de texto
+de iOS es difícil de automatizar por coordenadas de forma confiable) pero
+la lógica de guardado es la misma que ya cubre el test.
+
+**Estado:** vigente. `Configuración` ya no es una feature "fantasma" —
+tiene ruta (`/settings`), entrada en el drawer, y es alcanzable y usable
+por la administradora real.
+
+---
+
+## 2026-05-22 — Editar propiedad, habitación y huésped: mismo cabo suelto que `overrideTotalPrice`, tres veces
+
+**Contexto:** la revisión de alto también encontró que
+`PropertyRepository.update()`, `RoomRepository.update()` y
+`GuestRepository.update()` existían desde hacía sesiones — cada uno
+recibe la entidad completa y hace `_db.update(...).replace(...)` — pero
+ninguno estaba conectado a la UI. El PRD pide explícitamente "crear,
+**editar**, listar y desactivar" para `Property` y "CRUD" para `Room` y
+`Guest`; sin esto, una vez creada una propiedad/habitación/huésped con un
+dato mal escrito, no había forma de corregirlo desde la app.
+
+**Decisión — un mismo diálogo para crear y editar, no uno separado por
+caso:** `AddGuestDialog` y `AddRoomDialog` ya existían para crear; se les
+agregó un parámetro `initial` (`Guest?`/`Room?`) que, si viene con datos,
+precarga los controladores y cambia el título a "Editar...". Quien abre el
+diálogo decide con `create()` o `update()` según si vino de "+" o de tocar
+un ítem de la lista. Evita mantener dos formularios casi idénticos por
+entidad. Para `Property` no existía un diálogo propio — el alta usaba un
+`AlertDialog` inline con un solo campo (`name`) armado directo en
+`PropertiesPage`, a pesar de que la tabla ya tiene `address`, `ownerName`,
+`ownerContact` e `isPrimary` desde la pregunta 1 del PRD. Se creó
+`AddPropertyDialog` con los 5 campos y el mismo patrón `initial` —
+resuelve de una vez tanto "editar" como el hueco de que crear una
+propiedad nunca dejó cargar dirección/dueño.
+
+**Cómo arma cada pantalla la actualización:** el diálogo devuelve solo los
+valores nuevos (un record, ej. `NewGuestData`); quien llama usa
+`entidad.copyWith(...)` sobre la fila ya cargada en la lista (no hace
+falta releerla de la base) y pasa el resultado a `update()`. Drift genera
+`copyWith` con `Value<T?>` para columnas nullable (`address`, `documentId`,
+etc.), así que setear a `null` explícito y "no tocar el campo" son cosas
+distintas y ambas están disponibles.
+
+**Cabo suelto menor encontrado de paso:** `GuestRepository` no tenía
+`getById` (sí lo tenían `RoomRepository` y `ReservationRepository`) — se
+agregó porque el test de `update` lo necesitaba para releer la fila tras
+guardar, y es una operación básica que ya faltaba.
+
+**Verificación:** un test de `update()` por repositorio
+([property_repository_test.dart](../test/features/properties/data/property_repository_test.dart),
+[room_repository_test.dart](../test/features/rooms/data/room_repository_test.dart),
+[guest_repository_test.dart](../test/features/guests/data/guest_repository_test.dart)),
+cada uno comprobando que el `StreamProvider`/`watchX()` correspondiente
+refleja el cambio solo, sin invalidar nada a mano. Probado a mano en
+simulador: renombrar "Casa Sara" + cargar dirección + marcarla como
+principal se reflejó solo en la lista; renombrar "Cuarto 7" a
+"Cuarto 7 B" igual; cargarle un teléfono a "Ana Perez" persistió al
+reabrir el diálogo. La edición de tarifa de habitación y de moneda (sesión
+anterior) quedaron cubiertas solo por el test automatizado — el menú
+nativo de selección de texto de iOS resultó difícil de automatizar de
+forma confiable por coordenadas en el simulador, así que no se insistió
+más de lo razonable ahí.
+
+**Estado:** vigente. Sigue pendiente (anotado, no resuelto): historial de
+reservas por huésped (PRD 5.3) — tocar un huésped hoy abre "editar", no
+muestra sus reservas pasadas.
+
+---
+
+## 2026-05-22 — Historial de reservas por huésped: último cabo suelto de la revisión de alto
+
+**Contexto:** cierra el último punto pendiente de PRD 5.3. `Guest` es la
+única de las tres entidades (junto con `Property`/`Room`) que tiene algo
+más que atributos editables: un historial real de actividad (sus
+reservas). Eso cambió la decisión de UX respecto a como quedaron
+`Property`/`Room` en la sesión anterior.
+
+**Decisión de UX — `Guest` gana una pantalla de detalle; `Property`/`Room`
+no:** tocar una propiedad o habitación en su lista abre directo "editar"
+(no tienen "detalle" propio más allá de sus campos). Tocar un huésped
+ahora abre `GuestDetailPage` (nombre, contacto, notas, y el historial de
+reservas), con la edición movida a un ícono de lápiz junto al nombre —
+mismo patrón que "Precio total"/"Notas" en `ReservationDetailPage`. La
+diferencia se justifica por la entidad, no por capricho: un huésped
+acumula historial con el tiempo, una habitación no.
+
+**Decisión de arquitectura — reactivo también acá, buscando en la lista ya
+cargada en vez de un `FutureProvider` propio:** `GuestDetailPage` no pide
+el huésped por separado; lee `guestsProvider` (la lista completa, ya
+reactiva) y busca el que coincide con el `guestId` recibido por
+constructor. Ventaja real: si se edita el huésped desde el mismo ícono de
+la pantalla, el nombre de arriba se actualiza solo, sin `ref.invalidate`
+— lo mismo que ya pasa en las listas de `properties`/`rooms`/`guests`. El
+historial de reservas sí es un provider nuevo
+(`reservationsForGuestProvider`, `StreamProvider.family` sobre
+`ReservationRepository.watchByGuest()`) porque no existía ningún lugar que
+ya cargara "las reservas de un huésped puntual".
+
+**Refactor de paso — tercera duplicación de `_statusLabel` evitada:** ya
+existía copiado en `ReservationsPage` y `ReservationDetailPage`; al
+necesitarlo una tercera vez en `GuestDetailPage` se consolidó en
+`shared/utils/reservation_status_label.dart` (mismo criterio que
+`formatCents` en la sesión de Configuración — no se toca por gusto, se
+consolida cuando ya hay que tocar el código en varios lados por una razón
+real). `_formatDate` (fechas `dd/mm/yyyy`) quedó **sin consolidar** a
+propósito: ya estaba duplicado en 5+ lugares antes de esta sesión y
+ninguno de ellos se tocó por esta tarea — unificarlos habría sido un
+refactor aparte, no consecuencia directa de agregar el historial.
+
+**Verificación:** test de repositorio
+([reservation_repository_watch_test.dart](../test/features/reservations/data/reservation_repository_watch_test.dart))
+verificando que `watchByGuest` filtra por huésped (no trae las de otro) y
+ordena por fecha descendente; test de contenedor Riverpod
+([reservations_providers_watch_test.dart](../test/features/reservations/reservations_providers_watch_test.dart))
+para `reservationsForGuestProvider`. Probado a mano en simulador: tocar a
+"Ana Perez" mostró su teléfono (cargado en la sesión anterior) y sus 2
+reservas reales ordenadas por fecha; tocar una navegó al detalle correcto;
+el ícono de editar abrió el formulario con todos los campos precargados.
+
+**Estado:** vigente. Con esto, las 7 features del scaffold original más
+`Configuración` tienen UI real y completa — no queda ningún punto
+pendiente del PRD anotado en esta revisión de alto.

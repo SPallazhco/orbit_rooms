@@ -48,6 +48,13 @@ final paymentsProvider = StreamProvider<List<Payment>>(
   (ref) => ref.watch(paymentRepositoryProvider).watchAll(),
 );
 
+/// Historial de reservas de un huésped (PRD 5.3), en `GuestDetailPage`.
+final reservationsForGuestProvider =
+    StreamProvider.family<List<Reservation>, String>(
+      (ref, guestId) =>
+          ref.watch(reservationRepositoryProvider).watchByGuest(guestId),
+    );
+
 typedef ReservationDetailData = ({
   Reservation reservation,
   String guestName,

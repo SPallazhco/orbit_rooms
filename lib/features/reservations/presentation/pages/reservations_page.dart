@@ -1,18 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:orbit_rooms/core/database/app_database.dart';
+import 'package:orbit_rooms/core/settings/settings_providers.dart';
 import 'package:orbit_rooms/features/reservations/presentation/pages/create_reservation_page.dart';
 import 'package:orbit_rooms/features/reservations/presentation/pages/reservation_detail_page.dart';
 import 'package:orbit_rooms/features/reservations/reservations_providers.dart';
+import 'package:orbit_rooms/shared/utils/format_money.dart';
+import 'package:orbit_rooms/shared/utils/reservation_status_label.dart';
 import 'package:orbit_rooms/shared/widgets/app_drawer.dart';
-
-String _statusLabel(ReservationStatus status) => switch (status) {
-  ReservationStatus.pending => 'Pendiente',
-  ReservationStatus.confirmed => 'Confirmada',
-  ReservationStatus.checkedIn => 'Check-in hecho',
-  ReservationStatus.checkedOut => 'Check-out hecho',
-  ReservationStatus.cancelled => 'Cancelada',
-};
 
 class ReservationsPage extends ConsumerWidget {
   const ReservationsPage({super.key});
@@ -20,6 +14,7 @@ class ReservationsPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final reservationsAsync = ref.watch(reservationsProvider);
+    final currency = ref.watch(currencyProvider).value ?? 'USD';
 
     return Scaffold(
       appBar: AppBar(title: const Text('Reservas')),
@@ -42,10 +37,10 @@ class ReservationsPage extends ConsumerWidget {
                 subtitle: Text(
                   '${_formatDate(reservation.checkInDate)} → '
                   '${_formatDate(reservation.checkOutDate)} · '
-                  '${_statusLabel(reservation.status)}',
+                  '${reservationStatusLabel(reservation.status)}',
                 ),
                 trailing: Text(
-                  (reservation.totalPriceCents / 100).toStringAsFixed(2),
+                  formatCents(reservation.totalPriceCents, currency),
                 ),
                 onTap: () => Navigator.of(context).push(
                   MaterialPageRoute(
