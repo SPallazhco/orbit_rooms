@@ -17,6 +17,10 @@ class Rooms extends Table {
   /// Tarifa por persona, en centavos, viernes a domingo.
   IntColumn get ratePerPersonWeekendCents => integer()();
 
+  /// Tarifa por persona, en centavos, en fechas cargadas como feriado
+  /// (tabla `Holidays`). Tiene prioridad sobre entre-semana/fin-de-semana.
+  IntColumn get ratePerPersonHolidayCents => integer()();
+
   BoolColumn get isActive => boolean().withDefault(const Constant(true))();
 
   @override

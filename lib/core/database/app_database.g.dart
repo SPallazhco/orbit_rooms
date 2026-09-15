@@ -76,6 +76,21 @@ class $PropertiesTable extends Properties
     ),
     defaultValue: const Constant(false),
   );
+  static const VerificationMeta _isActiveMeta = const VerificationMeta(
+    'isActive',
+  );
+  @override
+  late final GeneratedColumn<bool> isActive = GeneratedColumn<bool>(
+    'is_active',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_active" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -84,6 +99,7 @@ class $PropertiesTable extends Properties
     ownerName,
     ownerContact,
     isPrimary,
+    isActive,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -135,6 +151,12 @@ class $PropertiesTable extends Properties
         isPrimary.isAcceptableOrUnknown(data['is_primary']!, _isPrimaryMeta),
       );
     }
+    if (data.containsKey('is_active')) {
+      context.handle(
+        _isActiveMeta,
+        isActive.isAcceptableOrUnknown(data['is_active']!, _isActiveMeta),
+      );
+    }
     return context;
   }
 
@@ -168,6 +190,10 @@ class $PropertiesTable extends Properties
         DriftSqlType.bool,
         data['${effectivePrefix}is_primary'],
       )!,
+      isActive: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_active'],
+      )!,
     );
   }
 
@@ -184,6 +210,7 @@ class Property extends DataClass implements Insertable<Property> {
   final String? ownerName;
   final String? ownerContact;
   final bool isPrimary;
+  final bool isActive;
   const Property({
     required this.id,
     required this.name,
@@ -191,6 +218,7 @@ class Property extends DataClass implements Insertable<Property> {
     this.ownerName,
     this.ownerContact,
     required this.isPrimary,
+    required this.isActive,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -207,6 +235,7 @@ class Property extends DataClass implements Insertable<Property> {
       map['owner_contact'] = Variable<String>(ownerContact);
     }
     map['is_primary'] = Variable<bool>(isPrimary);
+    map['is_active'] = Variable<bool>(isActive);
     return map;
   }
 
@@ -224,6 +253,7 @@ class Property extends DataClass implements Insertable<Property> {
           ? const Value.absent()
           : Value(ownerContact),
       isPrimary: Value(isPrimary),
+      isActive: Value(isActive),
     );
   }
 
@@ -239,6 +269,7 @@ class Property extends DataClass implements Insertable<Property> {
       ownerName: serializer.fromJson<String?>(json['ownerName']),
       ownerContact: serializer.fromJson<String?>(json['ownerContact']),
       isPrimary: serializer.fromJson<bool>(json['isPrimary']),
+      isActive: serializer.fromJson<bool>(json['isActive']),
     );
   }
   @override
@@ -251,6 +282,7 @@ class Property extends DataClass implements Insertable<Property> {
       'ownerName': serializer.toJson<String?>(ownerName),
       'ownerContact': serializer.toJson<String?>(ownerContact),
       'isPrimary': serializer.toJson<bool>(isPrimary),
+      'isActive': serializer.toJson<bool>(isActive),
     };
   }
 
@@ -261,6 +293,7 @@ class Property extends DataClass implements Insertable<Property> {
     Value<String?> ownerName = const Value.absent(),
     Value<String?> ownerContact = const Value.absent(),
     bool? isPrimary,
+    bool? isActive,
   }) => Property(
     id: id ?? this.id,
     name: name ?? this.name,
@@ -268,6 +301,7 @@ class Property extends DataClass implements Insertable<Property> {
     ownerName: ownerName.present ? ownerName.value : this.ownerName,
     ownerContact: ownerContact.present ? ownerContact.value : this.ownerContact,
     isPrimary: isPrimary ?? this.isPrimary,
+    isActive: isActive ?? this.isActive,
   );
   Property copyWithCompanion(PropertiesCompanion data) {
     return Property(
@@ -279,6 +313,7 @@ class Property extends DataClass implements Insertable<Property> {
           ? data.ownerContact.value
           : this.ownerContact,
       isPrimary: data.isPrimary.present ? data.isPrimary.value : this.isPrimary,
+      isActive: data.isActive.present ? data.isActive.value : this.isActive,
     );
   }
 
@@ -290,14 +325,22 @@ class Property extends DataClass implements Insertable<Property> {
           ..write('address: $address, ')
           ..write('ownerName: $ownerName, ')
           ..write('ownerContact: $ownerContact, ')
-          ..write('isPrimary: $isPrimary')
+          ..write('isPrimary: $isPrimary, ')
+          ..write('isActive: $isActive')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode =>
-      Object.hash(id, name, address, ownerName, ownerContact, isPrimary);
+  int get hashCode => Object.hash(
+    id,
+    name,
+    address,
+    ownerName,
+    ownerContact,
+    isPrimary,
+    isActive,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -307,7 +350,8 @@ class Property extends DataClass implements Insertable<Property> {
           other.address == this.address &&
           other.ownerName == this.ownerName &&
           other.ownerContact == this.ownerContact &&
-          other.isPrimary == this.isPrimary);
+          other.isPrimary == this.isPrimary &&
+          other.isActive == this.isActive);
 }
 
 class PropertiesCompanion extends UpdateCompanion<Property> {
@@ -317,6 +361,7 @@ class PropertiesCompanion extends UpdateCompanion<Property> {
   final Value<String?> ownerName;
   final Value<String?> ownerContact;
   final Value<bool> isPrimary;
+  final Value<bool> isActive;
   final Value<int> rowid;
   const PropertiesCompanion({
     this.id = const Value.absent(),
@@ -325,6 +370,7 @@ class PropertiesCompanion extends UpdateCompanion<Property> {
     this.ownerName = const Value.absent(),
     this.ownerContact = const Value.absent(),
     this.isPrimary = const Value.absent(),
+    this.isActive = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   PropertiesCompanion.insert({
@@ -334,6 +380,7 @@ class PropertiesCompanion extends UpdateCompanion<Property> {
     this.ownerName = const Value.absent(),
     this.ownerContact = const Value.absent(),
     this.isPrimary = const Value.absent(),
+    this.isActive = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : name = Value(name);
   static Insertable<Property> custom({
@@ -343,6 +390,7 @@ class PropertiesCompanion extends UpdateCompanion<Property> {
     Expression<String>? ownerName,
     Expression<String>? ownerContact,
     Expression<bool>? isPrimary,
+    Expression<bool>? isActive,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -352,6 +400,7 @@ class PropertiesCompanion extends UpdateCompanion<Property> {
       if (ownerName != null) 'owner_name': ownerName,
       if (ownerContact != null) 'owner_contact': ownerContact,
       if (isPrimary != null) 'is_primary': isPrimary,
+      if (isActive != null) 'is_active': isActive,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -363,6 +412,7 @@ class PropertiesCompanion extends UpdateCompanion<Property> {
     Value<String?>? ownerName,
     Value<String?>? ownerContact,
     Value<bool>? isPrimary,
+    Value<bool>? isActive,
     Value<int>? rowid,
   }) {
     return PropertiesCompanion(
@@ -372,6 +422,7 @@ class PropertiesCompanion extends UpdateCompanion<Property> {
       ownerName: ownerName ?? this.ownerName,
       ownerContact: ownerContact ?? this.ownerContact,
       isPrimary: isPrimary ?? this.isPrimary,
+      isActive: isActive ?? this.isActive,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -397,6 +448,9 @@ class PropertiesCompanion extends UpdateCompanion<Property> {
     if (isPrimary.present) {
       map['is_primary'] = Variable<bool>(isPrimary.value);
     }
+    if (isActive.present) {
+      map['is_active'] = Variable<bool>(isActive.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -412,6 +466,7 @@ class PropertiesCompanion extends UpdateCompanion<Property> {
           ..write('ownerName: $ownerName, ')
           ..write('ownerContact: $ownerContact, ')
           ..write('isPrimary: $isPrimary, ')
+          ..write('isActive: $isActive, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -704,6 +759,17 @@ class $RoomsTable extends Rooms with TableInfo<$RoomsTable, Room> {
         type: DriftSqlType.int,
         requiredDuringInsert: true,
       );
+  static const VerificationMeta _ratePerPersonHolidayCentsMeta =
+      const VerificationMeta('ratePerPersonHolidayCents');
+  @override
+  late final GeneratedColumn<int> ratePerPersonHolidayCents =
+      GeneratedColumn<int>(
+        'rate_per_person_holiday_cents',
+        aliasedName,
+        false,
+        type: DriftSqlType.int,
+        requiredDuringInsert: true,
+      );
   static const VerificationMeta _isActiveMeta = const VerificationMeta(
     'isActive',
   );
@@ -728,6 +794,7 @@ class $RoomsTable extends Rooms with TableInfo<$RoomsTable, Room> {
     capacity,
     ratePerPersonWeekdayCents,
     ratePerPersonWeekendCents,
+    ratePerPersonHolidayCents,
     isActive,
   ];
   @override
@@ -802,6 +869,17 @@ class $RoomsTable extends Rooms with TableInfo<$RoomsTable, Room> {
     } else if (isInserting) {
       context.missing(_ratePerPersonWeekendCentsMeta);
     }
+    if (data.containsKey('rate_per_person_holiday_cents')) {
+      context.handle(
+        _ratePerPersonHolidayCentsMeta,
+        ratePerPersonHolidayCents.isAcceptableOrUnknown(
+          data['rate_per_person_holiday_cents']!,
+          _ratePerPersonHolidayCentsMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_ratePerPersonHolidayCentsMeta);
+    }
     if (data.containsKey('is_active')) {
       context.handle(
         _isActiveMeta,
@@ -845,6 +923,10 @@ class $RoomsTable extends Rooms with TableInfo<$RoomsTable, Room> {
         DriftSqlType.int,
         data['${effectivePrefix}rate_per_person_weekend_cents'],
       )!,
+      ratePerPersonHolidayCents: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}rate_per_person_holiday_cents'],
+      )!,
       isActive: attachedDatabase.typeMapping.read(
         DriftSqlType.bool,
         data['${effectivePrefix}is_active'],
@@ -870,6 +952,10 @@ class Room extends DataClass implements Insertable<Room> {
 
   /// Tarifa por persona, en centavos, viernes a domingo.
   final int ratePerPersonWeekendCents;
+
+  /// Tarifa por persona, en centavos, en fechas cargadas como feriado
+  /// (tabla `Holidays`). Tiene prioridad sobre entre-semana/fin-de-semana.
+  final int ratePerPersonHolidayCents;
   final bool isActive;
   const Room({
     required this.id,
@@ -879,6 +965,7 @@ class Room extends DataClass implements Insertable<Room> {
     required this.capacity,
     required this.ratePerPersonWeekdayCents,
     required this.ratePerPersonWeekendCents,
+    required this.ratePerPersonHolidayCents,
     required this.isActive,
   });
   @override
@@ -895,6 +982,9 @@ class Room extends DataClass implements Insertable<Room> {
     map['rate_per_person_weekend_cents'] = Variable<int>(
       ratePerPersonWeekendCents,
     );
+    map['rate_per_person_holiday_cents'] = Variable<int>(
+      ratePerPersonHolidayCents,
+    );
     map['is_active'] = Variable<bool>(isActive);
     return map;
   }
@@ -908,6 +998,7 @@ class Room extends DataClass implements Insertable<Room> {
       capacity: Value(capacity),
       ratePerPersonWeekdayCents: Value(ratePerPersonWeekdayCents),
       ratePerPersonWeekendCents: Value(ratePerPersonWeekendCents),
+      ratePerPersonHolidayCents: Value(ratePerPersonHolidayCents),
       isActive: Value(isActive),
     );
   }
@@ -929,6 +1020,9 @@ class Room extends DataClass implements Insertable<Room> {
       ratePerPersonWeekendCents: serializer.fromJson<int>(
         json['ratePerPersonWeekendCents'],
       ),
+      ratePerPersonHolidayCents: serializer.fromJson<int>(
+        json['ratePerPersonHolidayCents'],
+      ),
       isActive: serializer.fromJson<bool>(json['isActive']),
     );
   }
@@ -947,6 +1041,9 @@ class Room extends DataClass implements Insertable<Room> {
       'ratePerPersonWeekendCents': serializer.toJson<int>(
         ratePerPersonWeekendCents,
       ),
+      'ratePerPersonHolidayCents': serializer.toJson<int>(
+        ratePerPersonHolidayCents,
+      ),
       'isActive': serializer.toJson<bool>(isActive),
     };
   }
@@ -959,6 +1056,7 @@ class Room extends DataClass implements Insertable<Room> {
     int? capacity,
     int? ratePerPersonWeekdayCents,
     int? ratePerPersonWeekendCents,
+    int? ratePerPersonHolidayCents,
     bool? isActive,
   }) => Room(
     id: id ?? this.id,
@@ -970,6 +1068,8 @@ class Room extends DataClass implements Insertable<Room> {
         ratePerPersonWeekdayCents ?? this.ratePerPersonWeekdayCents,
     ratePerPersonWeekendCents:
         ratePerPersonWeekendCents ?? this.ratePerPersonWeekendCents,
+    ratePerPersonHolidayCents:
+        ratePerPersonHolidayCents ?? this.ratePerPersonHolidayCents,
     isActive: isActive ?? this.isActive,
   );
   Room copyWithCompanion(RoomsCompanion data) {
@@ -989,6 +1089,9 @@ class Room extends DataClass implements Insertable<Room> {
       ratePerPersonWeekendCents: data.ratePerPersonWeekendCents.present
           ? data.ratePerPersonWeekendCents.value
           : this.ratePerPersonWeekendCents,
+      ratePerPersonHolidayCents: data.ratePerPersonHolidayCents.present
+          ? data.ratePerPersonHolidayCents.value
+          : this.ratePerPersonHolidayCents,
       isActive: data.isActive.present ? data.isActive.value : this.isActive,
     );
   }
@@ -1003,6 +1106,7 @@ class Room extends DataClass implements Insertable<Room> {
           ..write('capacity: $capacity, ')
           ..write('ratePerPersonWeekdayCents: $ratePerPersonWeekdayCents, ')
           ..write('ratePerPersonWeekendCents: $ratePerPersonWeekendCents, ')
+          ..write('ratePerPersonHolidayCents: $ratePerPersonHolidayCents, ')
           ..write('isActive: $isActive')
           ..write(')'))
         .toString();
@@ -1017,6 +1121,7 @@ class Room extends DataClass implements Insertable<Room> {
     capacity,
     ratePerPersonWeekdayCents,
     ratePerPersonWeekendCents,
+    ratePerPersonHolidayCents,
     isActive,
   );
   @override
@@ -1030,6 +1135,7 @@ class Room extends DataClass implements Insertable<Room> {
           other.capacity == this.capacity &&
           other.ratePerPersonWeekdayCents == this.ratePerPersonWeekdayCents &&
           other.ratePerPersonWeekendCents == this.ratePerPersonWeekendCents &&
+          other.ratePerPersonHolidayCents == this.ratePerPersonHolidayCents &&
           other.isActive == this.isActive);
 }
 
@@ -1041,6 +1147,7 @@ class RoomsCompanion extends UpdateCompanion<Room> {
   final Value<int> capacity;
   final Value<int> ratePerPersonWeekdayCents;
   final Value<int> ratePerPersonWeekendCents;
+  final Value<int> ratePerPersonHolidayCents;
   final Value<bool> isActive;
   final Value<int> rowid;
   const RoomsCompanion({
@@ -1051,6 +1158,7 @@ class RoomsCompanion extends UpdateCompanion<Room> {
     this.capacity = const Value.absent(),
     this.ratePerPersonWeekdayCents = const Value.absent(),
     this.ratePerPersonWeekendCents = const Value.absent(),
+    this.ratePerPersonHolidayCents = const Value.absent(),
     this.isActive = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -1062,6 +1170,7 @@ class RoomsCompanion extends UpdateCompanion<Room> {
     required int capacity,
     required int ratePerPersonWeekdayCents,
     required int ratePerPersonWeekendCents,
+    required int ratePerPersonHolidayCents,
     this.isActive = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : propertyId = Value(propertyId),
@@ -1069,7 +1178,8 @@ class RoomsCompanion extends UpdateCompanion<Room> {
        name = Value(name),
        capacity = Value(capacity),
        ratePerPersonWeekdayCents = Value(ratePerPersonWeekdayCents),
-       ratePerPersonWeekendCents = Value(ratePerPersonWeekendCents);
+       ratePerPersonWeekendCents = Value(ratePerPersonWeekendCents),
+       ratePerPersonHolidayCents = Value(ratePerPersonHolidayCents);
   static Insertable<Room> custom({
     Expression<String>? id,
     Expression<String>? propertyId,
@@ -1078,6 +1188,7 @@ class RoomsCompanion extends UpdateCompanion<Room> {
     Expression<int>? capacity,
     Expression<int>? ratePerPersonWeekdayCents,
     Expression<int>? ratePerPersonWeekendCents,
+    Expression<int>? ratePerPersonHolidayCents,
     Expression<bool>? isActive,
     Expression<int>? rowid,
   }) {
@@ -1091,6 +1202,8 @@ class RoomsCompanion extends UpdateCompanion<Room> {
         'rate_per_person_weekday_cents': ratePerPersonWeekdayCents,
       if (ratePerPersonWeekendCents != null)
         'rate_per_person_weekend_cents': ratePerPersonWeekendCents,
+      if (ratePerPersonHolidayCents != null)
+        'rate_per_person_holiday_cents': ratePerPersonHolidayCents,
       if (isActive != null) 'is_active': isActive,
       if (rowid != null) 'rowid': rowid,
     });
@@ -1104,6 +1217,7 @@ class RoomsCompanion extends UpdateCompanion<Room> {
     Value<int>? capacity,
     Value<int>? ratePerPersonWeekdayCents,
     Value<int>? ratePerPersonWeekendCents,
+    Value<int>? ratePerPersonHolidayCents,
     Value<bool>? isActive,
     Value<int>? rowid,
   }) {
@@ -1117,6 +1231,8 @@ class RoomsCompanion extends UpdateCompanion<Room> {
           ratePerPersonWeekdayCents ?? this.ratePerPersonWeekdayCents,
       ratePerPersonWeekendCents:
           ratePerPersonWeekendCents ?? this.ratePerPersonWeekendCents,
+      ratePerPersonHolidayCents:
+          ratePerPersonHolidayCents ?? this.ratePerPersonHolidayCents,
       isActive: isActive ?? this.isActive,
       rowid: rowid ?? this.rowid,
     );
@@ -1150,6 +1266,11 @@ class RoomsCompanion extends UpdateCompanion<Room> {
         ratePerPersonWeekendCents.value,
       );
     }
+    if (ratePerPersonHolidayCents.present) {
+      map['rate_per_person_holiday_cents'] = Variable<int>(
+        ratePerPersonHolidayCents.value,
+      );
+    }
     if (isActive.present) {
       map['is_active'] = Variable<bool>(isActive.value);
     }
@@ -1169,6 +1290,7 @@ class RoomsCompanion extends UpdateCompanion<Room> {
           ..write('capacity: $capacity, ')
           ..write('ratePerPersonWeekdayCents: $ratePerPersonWeekdayCents, ')
           ..write('ratePerPersonWeekendCents: $ratePerPersonWeekendCents, ')
+          ..write('ratePerPersonHolidayCents: $ratePerPersonHolidayCents, ')
           ..write('isActive: $isActive, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -1668,6 +1790,15 @@ class $ReservationsTable extends Reservations
     requiredDuringInsert: false,
     defaultValue: currentDateAndTime,
   );
+  static const VerificationMeta _notesMeta = const VerificationMeta('notes');
+  @override
+  late final GeneratedColumn<String> notes = GeneratedColumn<String>(
+    'notes',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -1677,6 +1808,7 @@ class $ReservationsTable extends Reservations
     status,
     totalPriceCents,
     createdAt,
+    notes,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -1740,6 +1872,12 @@ class $ReservationsTable extends Reservations
         createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
       );
     }
+    if (data.containsKey('notes')) {
+      context.handle(
+        _notesMeta,
+        notes.isAcceptableOrUnknown(data['notes']!, _notesMeta),
+      );
+    }
     return context;
   }
 
@@ -1779,6 +1917,10 @@ class $ReservationsTable extends Reservations
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
       )!,
+      notes: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}notes'],
+      ),
     );
   }
 
@@ -1809,6 +1951,11 @@ class Reservation extends DataClass implements Insertable<Reservation> {
   /// editable a mano.
   final int totalPriceCents;
   final DateTime createdAt;
+
+  /// Pedidos especiales (ej. "desayuno a las 7") o el motivo de un ajuste
+  /// manual al precio final (ej. auto adicional, multa) — ver
+  /// docs/DECISIONS.md.
+  final String? notes;
   const Reservation({
     required this.id,
     required this.guestId,
@@ -1817,6 +1964,7 @@ class Reservation extends DataClass implements Insertable<Reservation> {
     required this.status,
     required this.totalPriceCents,
     required this.createdAt,
+    this.notes,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -1832,6 +1980,9 @@ class Reservation extends DataClass implements Insertable<Reservation> {
     }
     map['total_price_cents'] = Variable<int>(totalPriceCents);
     map['created_at'] = Variable<DateTime>(createdAt);
+    if (!nullToAbsent || notes != null) {
+      map['notes'] = Variable<String>(notes);
+    }
     return map;
   }
 
@@ -1844,6 +1995,9 @@ class Reservation extends DataClass implements Insertable<Reservation> {
       status: Value(status),
       totalPriceCents: Value(totalPriceCents),
       createdAt: Value(createdAt),
+      notes: notes == null && nullToAbsent
+          ? const Value.absent()
+          : Value(notes),
     );
   }
 
@@ -1862,6 +2016,7 @@ class Reservation extends DataClass implements Insertable<Reservation> {
       ),
       totalPriceCents: serializer.fromJson<int>(json['totalPriceCents']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      notes: serializer.fromJson<String?>(json['notes']),
     );
   }
   @override
@@ -1877,6 +2032,7 @@ class Reservation extends DataClass implements Insertable<Reservation> {
       ),
       'totalPriceCents': serializer.toJson<int>(totalPriceCents),
       'createdAt': serializer.toJson<DateTime>(createdAt),
+      'notes': serializer.toJson<String?>(notes),
     };
   }
 
@@ -1888,6 +2044,7 @@ class Reservation extends DataClass implements Insertable<Reservation> {
     ReservationStatus? status,
     int? totalPriceCents,
     DateTime? createdAt,
+    Value<String?> notes = const Value.absent(),
   }) => Reservation(
     id: id ?? this.id,
     guestId: guestId ?? this.guestId,
@@ -1896,6 +2053,7 @@ class Reservation extends DataClass implements Insertable<Reservation> {
     status: status ?? this.status,
     totalPriceCents: totalPriceCents ?? this.totalPriceCents,
     createdAt: createdAt ?? this.createdAt,
+    notes: notes.present ? notes.value : this.notes,
   );
   Reservation copyWithCompanion(ReservationsCompanion data) {
     return Reservation(
@@ -1912,6 +2070,7 @@ class Reservation extends DataClass implements Insertable<Reservation> {
           ? data.totalPriceCents.value
           : this.totalPriceCents,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      notes: data.notes.present ? data.notes.value : this.notes,
     );
   }
 
@@ -1924,7 +2083,8 @@ class Reservation extends DataClass implements Insertable<Reservation> {
           ..write('checkOutDate: $checkOutDate, ')
           ..write('status: $status, ')
           ..write('totalPriceCents: $totalPriceCents, ')
-          ..write('createdAt: $createdAt')
+          ..write('createdAt: $createdAt, ')
+          ..write('notes: $notes')
           ..write(')'))
         .toString();
   }
@@ -1938,6 +2098,7 @@ class Reservation extends DataClass implements Insertable<Reservation> {
     status,
     totalPriceCents,
     createdAt,
+    notes,
   );
   @override
   bool operator ==(Object other) =>
@@ -1949,7 +2110,8 @@ class Reservation extends DataClass implements Insertable<Reservation> {
           other.checkOutDate == this.checkOutDate &&
           other.status == this.status &&
           other.totalPriceCents == this.totalPriceCents &&
-          other.createdAt == this.createdAt);
+          other.createdAt == this.createdAt &&
+          other.notes == this.notes);
 }
 
 class ReservationsCompanion extends UpdateCompanion<Reservation> {
@@ -1960,6 +2122,7 @@ class ReservationsCompanion extends UpdateCompanion<Reservation> {
   final Value<ReservationStatus> status;
   final Value<int> totalPriceCents;
   final Value<DateTime> createdAt;
+  final Value<String?> notes;
   final Value<int> rowid;
   const ReservationsCompanion({
     this.id = const Value.absent(),
@@ -1969,6 +2132,7 @@ class ReservationsCompanion extends UpdateCompanion<Reservation> {
     this.status = const Value.absent(),
     this.totalPriceCents = const Value.absent(),
     this.createdAt = const Value.absent(),
+    this.notes = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   ReservationsCompanion.insert({
@@ -1979,6 +2143,7 @@ class ReservationsCompanion extends UpdateCompanion<Reservation> {
     this.status = const Value.absent(),
     required int totalPriceCents,
     this.createdAt = const Value.absent(),
+    this.notes = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : guestId = Value(guestId),
        checkInDate = Value(checkInDate),
@@ -1992,6 +2157,7 @@ class ReservationsCompanion extends UpdateCompanion<Reservation> {
     Expression<String>? status,
     Expression<int>? totalPriceCents,
     Expression<DateTime>? createdAt,
+    Expression<String>? notes,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -2002,6 +2168,7 @@ class ReservationsCompanion extends UpdateCompanion<Reservation> {
       if (status != null) 'status': status,
       if (totalPriceCents != null) 'total_price_cents': totalPriceCents,
       if (createdAt != null) 'created_at': createdAt,
+      if (notes != null) 'notes': notes,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -2014,6 +2181,7 @@ class ReservationsCompanion extends UpdateCompanion<Reservation> {
     Value<ReservationStatus>? status,
     Value<int>? totalPriceCents,
     Value<DateTime>? createdAt,
+    Value<String?>? notes,
     Value<int>? rowid,
   }) {
     return ReservationsCompanion(
@@ -2024,6 +2192,7 @@ class ReservationsCompanion extends UpdateCompanion<Reservation> {
       status: status ?? this.status,
       totalPriceCents: totalPriceCents ?? this.totalPriceCents,
       createdAt: createdAt ?? this.createdAt,
+      notes: notes ?? this.notes,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -2054,6 +2223,9 @@ class ReservationsCompanion extends UpdateCompanion<Reservation> {
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
+    if (notes.present) {
+      map['notes'] = Variable<String>(notes.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -2070,6 +2242,7 @@ class ReservationsCompanion extends UpdateCompanion<Reservation> {
           ..write('status: $status, ')
           ..write('totalPriceCents: $totalPriceCents, ')
           ..write('createdAt: $createdAt, ')
+          ..write('notes: $notes, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -3041,6 +3214,526 @@ class AppSettingsCompanion extends UpdateCompanion<AppSetting> {
   }
 }
 
+class $HolidaysTable extends Holidays with TableInfo<$HolidaysTable, Holiday> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $HolidaysTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    clientDefault: () => const Uuid().v4(),
+  );
+  static const VerificationMeta _dateMeta = const VerificationMeta('date');
+  @override
+  late final GeneratedColumn<DateTime> date = GeneratedColumn<DateTime>(
+    'date',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  @override
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+    'name',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [id, date, name];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'holidays';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<Holiday> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('date')) {
+      context.handle(
+        _dateMeta,
+        date.isAcceptableOrUnknown(data['date']!, _dateMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_dateMeta);
+    }
+    if (data.containsKey('name')) {
+      context.handle(
+        _nameMeta,
+        name.isAcceptableOrUnknown(data['name']!, _nameMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  List<Set<GeneratedColumn>> get uniqueKeys => [
+    {date},
+  ];
+  @override
+  Holiday map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return Holiday(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      date: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}date'],
+      )!,
+      name: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}name'],
+      ),
+    );
+  }
+
+  @override
+  $HolidaysTable createAlias(String alias) {
+    return $HolidaysTable(attachedDatabase, alias);
+  }
+}
+
+class Holiday extends DataClass implements Insertable<Holiday> {
+  final String id;
+  final DateTime date;
+  final String? name;
+  const Holiday({required this.id, required this.date, this.name});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['date'] = Variable<DateTime>(date);
+    if (!nullToAbsent || name != null) {
+      map['name'] = Variable<String>(name);
+    }
+    return map;
+  }
+
+  HolidaysCompanion toCompanion(bool nullToAbsent) {
+    return HolidaysCompanion(
+      id: Value(id),
+      date: Value(date),
+      name: name == null && nullToAbsent ? const Value.absent() : Value(name),
+    );
+  }
+
+  factory Holiday.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return Holiday(
+      id: serializer.fromJson<String>(json['id']),
+      date: serializer.fromJson<DateTime>(json['date']),
+      name: serializer.fromJson<String?>(json['name']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'date': serializer.toJson<DateTime>(date),
+      'name': serializer.toJson<String?>(name),
+    };
+  }
+
+  Holiday copyWith({
+    String? id,
+    DateTime? date,
+    Value<String?> name = const Value.absent(),
+  }) => Holiday(
+    id: id ?? this.id,
+    date: date ?? this.date,
+    name: name.present ? name.value : this.name,
+  );
+  Holiday copyWithCompanion(HolidaysCompanion data) {
+    return Holiday(
+      id: data.id.present ? data.id.value : this.id,
+      date: data.date.present ? data.date.value : this.date,
+      name: data.name.present ? data.name.value : this.name,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('Holiday(')
+          ..write('id: $id, ')
+          ..write('date: $date, ')
+          ..write('name: $name')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, date, name);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is Holiday &&
+          other.id == this.id &&
+          other.date == this.date &&
+          other.name == this.name);
+}
+
+class HolidaysCompanion extends UpdateCompanion<Holiday> {
+  final Value<String> id;
+  final Value<DateTime> date;
+  final Value<String?> name;
+  final Value<int> rowid;
+  const HolidaysCompanion({
+    this.id = const Value.absent(),
+    this.date = const Value.absent(),
+    this.name = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  HolidaysCompanion.insert({
+    this.id = const Value.absent(),
+    required DateTime date,
+    this.name = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : date = Value(date);
+  static Insertable<Holiday> custom({
+    Expression<String>? id,
+    Expression<DateTime>? date,
+    Expression<String>? name,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (date != null) 'date': date,
+      if (name != null) 'name': name,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  HolidaysCompanion copyWith({
+    Value<String>? id,
+    Value<DateTime>? date,
+    Value<String?>? name,
+    Value<int>? rowid,
+  }) {
+    return HolidaysCompanion(
+      id: id ?? this.id,
+      date: date ?? this.date,
+      name: name ?? this.name,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (date.present) {
+      map['date'] = Variable<DateTime>(date.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('HolidaysCompanion(')
+          ..write('id: $id, ')
+          ..write('date: $date, ')
+          ..write('name: $name, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $VehiclesTable extends Vehicles with TableInfo<$VehiclesTable, Vehicle> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $VehiclesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    clientDefault: () => const Uuid().v4(),
+  );
+  static const VerificationMeta _reservationIdMeta = const VerificationMeta(
+    'reservationId',
+  );
+  @override
+  late final GeneratedColumn<String> reservationId = GeneratedColumn<String>(
+    'reservation_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES reservations (id)',
+    ),
+  );
+  static const VerificationMeta _plateMeta = const VerificationMeta('plate');
+  @override
+  late final GeneratedColumn<String> plate = GeneratedColumn<String>(
+    'plate',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [id, reservationId, plate];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'vehicles';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<Vehicle> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('reservation_id')) {
+      context.handle(
+        _reservationIdMeta,
+        reservationId.isAcceptableOrUnknown(
+          data['reservation_id']!,
+          _reservationIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_reservationIdMeta);
+    }
+    if (data.containsKey('plate')) {
+      context.handle(
+        _plateMeta,
+        plate.isAcceptableOrUnknown(data['plate']!, _plateMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_plateMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  Vehicle map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return Vehicle(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      reservationId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}reservation_id'],
+      )!,
+      plate: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}plate'],
+      )!,
+    );
+  }
+
+  @override
+  $VehiclesTable createAlias(String alias) {
+    return $VehiclesTable(attachedDatabase, alias);
+  }
+}
+
+class Vehicle extends DataClass implements Insertable<Vehicle> {
+  final String id;
+  final String reservationId;
+  final String plate;
+  const Vehicle({
+    required this.id,
+    required this.reservationId,
+    required this.plate,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['reservation_id'] = Variable<String>(reservationId);
+    map['plate'] = Variable<String>(plate);
+    return map;
+  }
+
+  VehiclesCompanion toCompanion(bool nullToAbsent) {
+    return VehiclesCompanion(
+      id: Value(id),
+      reservationId: Value(reservationId),
+      plate: Value(plate),
+    );
+  }
+
+  factory Vehicle.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return Vehicle(
+      id: serializer.fromJson<String>(json['id']),
+      reservationId: serializer.fromJson<String>(json['reservationId']),
+      plate: serializer.fromJson<String>(json['plate']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'reservationId': serializer.toJson<String>(reservationId),
+      'plate': serializer.toJson<String>(plate),
+    };
+  }
+
+  Vehicle copyWith({String? id, String? reservationId, String? plate}) =>
+      Vehicle(
+        id: id ?? this.id,
+        reservationId: reservationId ?? this.reservationId,
+        plate: plate ?? this.plate,
+      );
+  Vehicle copyWithCompanion(VehiclesCompanion data) {
+    return Vehicle(
+      id: data.id.present ? data.id.value : this.id,
+      reservationId: data.reservationId.present
+          ? data.reservationId.value
+          : this.reservationId,
+      plate: data.plate.present ? data.plate.value : this.plate,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('Vehicle(')
+          ..write('id: $id, ')
+          ..write('reservationId: $reservationId, ')
+          ..write('plate: $plate')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, reservationId, plate);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is Vehicle &&
+          other.id == this.id &&
+          other.reservationId == this.reservationId &&
+          other.plate == this.plate);
+}
+
+class VehiclesCompanion extends UpdateCompanion<Vehicle> {
+  final Value<String> id;
+  final Value<String> reservationId;
+  final Value<String> plate;
+  final Value<int> rowid;
+  const VehiclesCompanion({
+    this.id = const Value.absent(),
+    this.reservationId = const Value.absent(),
+    this.plate = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  VehiclesCompanion.insert({
+    this.id = const Value.absent(),
+    required String reservationId,
+    required String plate,
+    this.rowid = const Value.absent(),
+  }) : reservationId = Value(reservationId),
+       plate = Value(plate);
+  static Insertable<Vehicle> custom({
+    Expression<String>? id,
+    Expression<String>? reservationId,
+    Expression<String>? plate,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (reservationId != null) 'reservation_id': reservationId,
+      if (plate != null) 'plate': plate,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  VehiclesCompanion copyWith({
+    Value<String>? id,
+    Value<String>? reservationId,
+    Value<String>? plate,
+    Value<int>? rowid,
+  }) {
+    return VehiclesCompanion(
+      id: id ?? this.id,
+      reservationId: reservationId ?? this.reservationId,
+      plate: plate ?? this.plate,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (reservationId.present) {
+      map['reservation_id'] = Variable<String>(reservationId.value);
+    }
+    if (plate.present) {
+      map['plate'] = Variable<String>(plate.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('VehiclesCompanion(')
+          ..write('id: $id, ')
+          ..write('reservationId: $reservationId, ')
+          ..write('plate: $plate, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -3054,6 +3747,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   );
   late final $PaymentsTable payments = $PaymentsTable(this);
   late final $AppSettingsTable appSettings = $AppSettingsTable(this);
+  late final $HolidaysTable holidays = $HolidaysTable(this);
+  late final $VehiclesTable vehicles = $VehiclesTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -3067,6 +3762,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     reservationRooms,
     payments,
     appSettings,
+    holidays,
+    vehicles,
   ];
 }
 
@@ -3078,6 +3775,7 @@ typedef $$PropertiesTableCreateCompanionBuilder =
       Value<String?> ownerName,
       Value<String?> ownerContact,
       Value<bool> isPrimary,
+      Value<bool> isActive,
       Value<int> rowid,
     });
 typedef $$PropertiesTableUpdateCompanionBuilder =
@@ -3088,6 +3786,7 @@ typedef $$PropertiesTableUpdateCompanionBuilder =
       Value<String?> ownerName,
       Value<String?> ownerContact,
       Value<bool> isPrimary,
+      Value<bool> isActive,
       Value<int> rowid,
     });
 
@@ -3151,6 +3850,11 @@ class $$PropertiesTableFilterComposer
 
   ColumnFilters<bool> get isPrimary => $composableBuilder(
     column: $table.isPrimary,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isActive => $composableBuilder(
+    column: $table.isActive,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -3218,6 +3922,11 @@ class $$PropertiesTableOrderingComposer
     column: $table.isPrimary,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<bool> get isActive => $composableBuilder(
+    column: $table.isActive,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$PropertiesTableAnnotationComposer
@@ -3248,6 +3957,9 @@ class $$PropertiesTableAnnotationComposer
 
   GeneratedColumn<bool> get isPrimary =>
       $composableBuilder(column: $table.isPrimary, builder: (column) => column);
+
+  GeneratedColumn<bool> get isActive =>
+      $composableBuilder(column: $table.isActive, builder: (column) => column);
 
   Expression<T> roomsRefs<T extends Object>(
     Expression<T> Function($$RoomsTableAnnotationComposer a) f,
@@ -3309,6 +4021,7 @@ class $$PropertiesTableTableManager
                 Value<String?> ownerName = const Value.absent(),
                 Value<String?> ownerContact = const Value.absent(),
                 Value<bool> isPrimary = const Value.absent(),
+                Value<bool> isActive = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => PropertiesCompanion(
                 id: id,
@@ -3317,6 +4030,7 @@ class $$PropertiesTableTableManager
                 ownerName: ownerName,
                 ownerContact: ownerContact,
                 isPrimary: isPrimary,
+                isActive: isActive,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -3327,6 +4041,7 @@ class $$PropertiesTableTableManager
                 Value<String?> ownerName = const Value.absent(),
                 Value<String?> ownerContact = const Value.absent(),
                 Value<bool> isPrimary = const Value.absent(),
+                Value<bool> isActive = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => PropertiesCompanion.insert(
                 id: id,
@@ -3335,6 +4050,7 @@ class $$PropertiesTableTableManager
                 ownerName: ownerName,
                 ownerContact: ownerContact,
                 isPrimary: isPrimary,
+                isActive: isActive,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -3623,6 +4339,7 @@ typedef $$RoomsTableCreateCompanionBuilder =
       required int capacity,
       required int ratePerPersonWeekdayCents,
       required int ratePerPersonWeekendCents,
+      required int ratePerPersonHolidayCents,
       Value<bool> isActive,
       Value<int> rowid,
     });
@@ -3635,6 +4352,7 @@ typedef $$RoomsTableUpdateCompanionBuilder =
       Value<int> capacity,
       Value<int> ratePerPersonWeekdayCents,
       Value<int> ratePerPersonWeekendCents,
+      Value<int> ratePerPersonHolidayCents,
       Value<bool> isActive,
       Value<int> rowid,
     });
@@ -3728,6 +4446,11 @@ class $$RoomsTableFilterComposer extends Composer<_$AppDatabase, $RoomsTable> {
 
   ColumnFilters<int> get ratePerPersonWeekendCents => $composableBuilder(
     column: $table.ratePerPersonWeekendCents,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get ratePerPersonHolidayCents => $composableBuilder(
+    column: $table.ratePerPersonHolidayCents,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -3842,6 +4565,11 @@ class $$RoomsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get ratePerPersonHolidayCents => $composableBuilder(
+    column: $table.ratePerPersonHolidayCents,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<bool> get isActive => $composableBuilder(
     column: $table.isActive,
     builder: (column) => ColumnOrderings(column),
@@ -3919,6 +4647,11 @@ class $$RoomsTableAnnotationComposer
 
   GeneratedColumn<int> get ratePerPersonWeekendCents => $composableBuilder(
     column: $table.ratePerPersonWeekendCents,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get ratePerPersonHolidayCents => $composableBuilder(
+    column: $table.ratePerPersonHolidayCents,
     builder: (column) => column,
   );
 
@@ -4036,6 +4769,7 @@ class $$RoomsTableTableManager
                 Value<int> capacity = const Value.absent(),
                 Value<int> ratePerPersonWeekdayCents = const Value.absent(),
                 Value<int> ratePerPersonWeekendCents = const Value.absent(),
+                Value<int> ratePerPersonHolidayCents = const Value.absent(),
                 Value<bool> isActive = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => RoomsCompanion(
@@ -4046,6 +4780,7 @@ class $$RoomsTableTableManager
                 capacity: capacity,
                 ratePerPersonWeekdayCents: ratePerPersonWeekdayCents,
                 ratePerPersonWeekendCents: ratePerPersonWeekendCents,
+                ratePerPersonHolidayCents: ratePerPersonHolidayCents,
                 isActive: isActive,
                 rowid: rowid,
               ),
@@ -4058,6 +4793,7 @@ class $$RoomsTableTableManager
                 required int capacity,
                 required int ratePerPersonWeekdayCents,
                 required int ratePerPersonWeekendCents,
+                required int ratePerPersonHolidayCents,
                 Value<bool> isActive = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => RoomsCompanion.insert(
@@ -4068,6 +4804,7 @@ class $$RoomsTableTableManager
                 capacity: capacity,
                 ratePerPersonWeekdayCents: ratePerPersonWeekdayCents,
                 ratePerPersonWeekendCents: ratePerPersonWeekendCents,
+                ratePerPersonHolidayCents: ratePerPersonHolidayCents,
                 isActive: isActive,
                 rowid: rowid,
               ),
@@ -4506,6 +5243,7 @@ typedef $$ReservationsTableCreateCompanionBuilder =
       Value<ReservationStatus> status,
       required int totalPriceCents,
       Value<DateTime> createdAt,
+      Value<String?> notes,
       Value<int> rowid,
     });
 typedef $$ReservationsTableUpdateCompanionBuilder =
@@ -4517,6 +5255,7 @@ typedef $$ReservationsTableUpdateCompanionBuilder =
       Value<ReservationStatus> status,
       Value<int> totalPriceCents,
       Value<DateTime> createdAt,
+      Value<String?> notes,
       Value<int> rowid,
     });
 
@@ -4586,6 +5325,28 @@ final class $$ReservationsTableReferences
       manager.$state.copyWith(prefetchedData: cache),
     );
   }
+
+  static MultiTypedResultKey<$VehiclesTable, List<Vehicle>> _vehiclesRefsTable(
+    _$AppDatabase db,
+  ) => MultiTypedResultKey.fromTable(
+    db.vehicles,
+    aliasName: $_aliasNameGenerator(
+      db.reservations.id,
+      db.vehicles.reservationId,
+    ),
+  );
+
+  $$VehiclesTableProcessedTableManager get vehiclesRefs {
+    final manager = $$VehiclesTableTableManager(
+      $_db,
+      $_db.vehicles,
+    ).filter((f) => f.reservationId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_vehiclesRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
 }
 
 class $$ReservationsTableFilterComposer
@@ -4625,6 +5386,11 @@ class $$ReservationsTableFilterComposer
 
   ColumnFilters<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get notes => $composableBuilder(
+    column: $table.notes,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -4700,6 +5466,31 @@ class $$ReservationsTableFilterComposer
     );
     return f(composer);
   }
+
+  Expression<bool> vehiclesRefs(
+    Expression<bool> Function($$VehiclesTableFilterComposer f) f,
+  ) {
+    final $$VehiclesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.vehicles,
+      getReferencedColumn: (t) => t.reservationId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$VehiclesTableFilterComposer(
+            $db: $db,
+            $table: $db.vehicles,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
 }
 
 class $$ReservationsTableOrderingComposer
@@ -4738,6 +5529,11 @@ class $$ReservationsTableOrderingComposer
 
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get notes => $composableBuilder(
+    column: $table.notes,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -4797,6 +5593,9 @@ class $$ReservationsTableAnnotationComposer
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<String> get notes =>
+      $composableBuilder(column: $table.notes, builder: (column) => column);
 
   $$GuestsTableAnnotationComposer get guestId {
     final $$GuestsTableAnnotationComposer composer = $composerBuilder(
@@ -4870,6 +5669,31 @@ class $$ReservationsTableAnnotationComposer
     );
     return f(composer);
   }
+
+  Expression<T> vehiclesRefs<T extends Object>(
+    Expression<T> Function($$VehiclesTableAnnotationComposer a) f,
+  ) {
+    final $$VehiclesTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.vehicles,
+      getReferencedColumn: (t) => t.reservationId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$VehiclesTableAnnotationComposer(
+            $db: $db,
+            $table: $db.vehicles,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
 }
 
 class $$ReservationsTableTableManager
@@ -4889,6 +5713,7 @@ class $$ReservationsTableTableManager
             bool guestId,
             bool reservationRoomsRefs,
             bool paymentsRefs,
+            bool vehiclesRefs,
           })
         > {
   $$ReservationsTableTableManager(_$AppDatabase db, $ReservationsTable table)
@@ -4911,6 +5736,7 @@ class $$ReservationsTableTableManager
                 Value<ReservationStatus> status = const Value.absent(),
                 Value<int> totalPriceCents = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
+                Value<String?> notes = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ReservationsCompanion(
                 id: id,
@@ -4920,6 +5746,7 @@ class $$ReservationsTableTableManager
                 status: status,
                 totalPriceCents: totalPriceCents,
                 createdAt: createdAt,
+                notes: notes,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -4931,6 +5758,7 @@ class $$ReservationsTableTableManager
                 Value<ReservationStatus> status = const Value.absent(),
                 required int totalPriceCents,
                 Value<DateTime> createdAt = const Value.absent(),
+                Value<String?> notes = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ReservationsCompanion.insert(
                 id: id,
@@ -4940,6 +5768,7 @@ class $$ReservationsTableTableManager
                 status: status,
                 totalPriceCents: totalPriceCents,
                 createdAt: createdAt,
+                notes: notes,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -4955,12 +5784,14 @@ class $$ReservationsTableTableManager
                 guestId = false,
                 reservationRoomsRefs = false,
                 paymentsRefs = false,
+                vehiclesRefs = false,
               }) {
                 return PrefetchHooks(
                   db: db,
                   explicitlyWatchedTables: [
                     if (reservationRoomsRefs) db.reservationRooms,
                     if (paymentsRefs) db.payments,
+                    if (vehiclesRefs) db.vehicles,
                   ],
                   addJoins:
                       <
@@ -5040,6 +5871,27 @@ class $$ReservationsTableTableManager
                               ),
                           typedResults: items,
                         ),
+                      if (vehiclesRefs)
+                        await $_getPrefetchedData<
+                          Reservation,
+                          $ReservationsTable,
+                          Vehicle
+                        >(
+                          currentTable: table,
+                          referencedTable: $$ReservationsTableReferences
+                              ._vehiclesRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$ReservationsTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).vehiclesRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.reservationId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
                     ];
                   },
                 );
@@ -5064,6 +5916,7 @@ typedef $$ReservationsTableProcessedTableManager =
         bool guestId,
         bool reservationRoomsRefs,
         bool paymentsRefs,
+        bool vehiclesRefs,
       })
     >;
 typedef $$ReservationRoomsTableCreateCompanionBuilder =
@@ -5955,6 +6808,443 @@ typedef $$AppSettingsTableProcessedTableManager =
       AppSetting,
       PrefetchHooks Function()
     >;
+typedef $$HolidaysTableCreateCompanionBuilder =
+    HolidaysCompanion Function({
+      Value<String> id,
+      required DateTime date,
+      Value<String?> name,
+      Value<int> rowid,
+    });
+typedef $$HolidaysTableUpdateCompanionBuilder =
+    HolidaysCompanion Function({
+      Value<String> id,
+      Value<DateTime> date,
+      Value<String?> name,
+      Value<int> rowid,
+    });
+
+class $$HolidaysTableFilterComposer
+    extends Composer<_$AppDatabase, $HolidaysTable> {
+  $$HolidaysTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get date => $composableBuilder(
+    column: $table.date,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$HolidaysTableOrderingComposer
+    extends Composer<_$AppDatabase, $HolidaysTable> {
+  $$HolidaysTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get date => $composableBuilder(
+    column: $table.date,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$HolidaysTableAnnotationComposer
+    extends Composer<_$AppDatabase, $HolidaysTable> {
+  $$HolidaysTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get date =>
+      $composableBuilder(column: $table.date, builder: (column) => column);
+
+  GeneratedColumn<String> get name =>
+      $composableBuilder(column: $table.name, builder: (column) => column);
+}
+
+class $$HolidaysTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $HolidaysTable,
+          Holiday,
+          $$HolidaysTableFilterComposer,
+          $$HolidaysTableOrderingComposer,
+          $$HolidaysTableAnnotationComposer,
+          $$HolidaysTableCreateCompanionBuilder,
+          $$HolidaysTableUpdateCompanionBuilder,
+          (Holiday, BaseReferences<_$AppDatabase, $HolidaysTable, Holiday>),
+          Holiday,
+          PrefetchHooks Function()
+        > {
+  $$HolidaysTableTableManager(_$AppDatabase db, $HolidaysTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$HolidaysTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$HolidaysTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$HolidaysTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<DateTime> date = const Value.absent(),
+                Value<String?> name = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => HolidaysCompanion(
+                id: id,
+                date: date,
+                name: name,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                required DateTime date,
+                Value<String?> name = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => HolidaysCompanion.insert(
+                id: id,
+                date: date,
+                name: name,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$HolidaysTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $HolidaysTable,
+      Holiday,
+      $$HolidaysTableFilterComposer,
+      $$HolidaysTableOrderingComposer,
+      $$HolidaysTableAnnotationComposer,
+      $$HolidaysTableCreateCompanionBuilder,
+      $$HolidaysTableUpdateCompanionBuilder,
+      (Holiday, BaseReferences<_$AppDatabase, $HolidaysTable, Holiday>),
+      Holiday,
+      PrefetchHooks Function()
+    >;
+typedef $$VehiclesTableCreateCompanionBuilder =
+    VehiclesCompanion Function({
+      Value<String> id,
+      required String reservationId,
+      required String plate,
+      Value<int> rowid,
+    });
+typedef $$VehiclesTableUpdateCompanionBuilder =
+    VehiclesCompanion Function({
+      Value<String> id,
+      Value<String> reservationId,
+      Value<String> plate,
+      Value<int> rowid,
+    });
+
+final class $$VehiclesTableReferences
+    extends BaseReferences<_$AppDatabase, $VehiclesTable, Vehicle> {
+  $$VehiclesTableReferences(super.$_db, super.$_table, super.$_typedResult);
+
+  static $ReservationsTable _reservationIdTable(_$AppDatabase db) =>
+      db.reservations.createAlias(
+        $_aliasNameGenerator(db.vehicles.reservationId, db.reservations.id),
+      );
+
+  $$ReservationsTableProcessedTableManager get reservationId {
+    final $_column = $_itemColumn<String>('reservation_id')!;
+
+    final manager = $$ReservationsTableTableManager(
+      $_db,
+      $_db.reservations,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_reservationIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$VehiclesTableFilterComposer
+    extends Composer<_$AppDatabase, $VehiclesTable> {
+  $$VehiclesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get plate => $composableBuilder(
+    column: $table.plate,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$ReservationsTableFilterComposer get reservationId {
+    final $$ReservationsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.reservationId,
+      referencedTable: $db.reservations,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ReservationsTableFilterComposer(
+            $db: $db,
+            $table: $db.reservations,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$VehiclesTableOrderingComposer
+    extends Composer<_$AppDatabase, $VehiclesTable> {
+  $$VehiclesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get plate => $composableBuilder(
+    column: $table.plate,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$ReservationsTableOrderingComposer get reservationId {
+    final $$ReservationsTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.reservationId,
+      referencedTable: $db.reservations,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ReservationsTableOrderingComposer(
+            $db: $db,
+            $table: $db.reservations,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$VehiclesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $VehiclesTable> {
+  $$VehiclesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get plate =>
+      $composableBuilder(column: $table.plate, builder: (column) => column);
+
+  $$ReservationsTableAnnotationComposer get reservationId {
+    final $$ReservationsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.reservationId,
+      referencedTable: $db.reservations,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ReservationsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.reservations,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$VehiclesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $VehiclesTable,
+          Vehicle,
+          $$VehiclesTableFilterComposer,
+          $$VehiclesTableOrderingComposer,
+          $$VehiclesTableAnnotationComposer,
+          $$VehiclesTableCreateCompanionBuilder,
+          $$VehiclesTableUpdateCompanionBuilder,
+          (Vehicle, $$VehiclesTableReferences),
+          Vehicle,
+          PrefetchHooks Function({bool reservationId})
+        > {
+  $$VehiclesTableTableManager(_$AppDatabase db, $VehiclesTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$VehiclesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$VehiclesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$VehiclesTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> reservationId = const Value.absent(),
+                Value<String> plate = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => VehiclesCompanion(
+                id: id,
+                reservationId: reservationId,
+                plate: plate,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                required String reservationId,
+                required String plate,
+                Value<int> rowid = const Value.absent(),
+              }) => VehiclesCompanion.insert(
+                id: id,
+                reservationId: reservationId,
+                plate: plate,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$VehiclesTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({reservationId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (reservationId) {
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.reservationId,
+                                referencedTable: $$VehiclesTableReferences
+                                    ._reservationIdTable(db),
+                                referencedColumn: $$VehiclesTableReferences
+                                    ._reservationIdTable(db)
+                                    .id,
+                              )
+                              as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$VehiclesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $VehiclesTable,
+      Vehicle,
+      $$VehiclesTableFilterComposer,
+      $$VehiclesTableOrderingComposer,
+      $$VehiclesTableAnnotationComposer,
+      $$VehiclesTableCreateCompanionBuilder,
+      $$VehiclesTableUpdateCompanionBuilder,
+      (Vehicle, $$VehiclesTableReferences),
+      Vehicle,
+      PrefetchHooks Function({bool reservationId})
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -5975,4 +7265,8 @@ class $AppDatabaseManager {
       $$PaymentsTableTableManager(_db, _db.payments);
   $$AppSettingsTableTableManager get appSettings =>
       $$AppSettingsTableTableManager(_db, _db.appSettings);
+  $$HolidaysTableTableManager get holidays =>
+      $$HolidaysTableTableManager(_db, _db.holidays);
+  $$VehiclesTableTableManager get vehicles =>
+      $$VehiclesTableTableManager(_db, _db.vehicles);
 }

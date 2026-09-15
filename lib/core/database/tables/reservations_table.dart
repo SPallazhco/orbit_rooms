@@ -15,10 +15,9 @@ class Reservations extends Table {
   /// Fecha de calendario, sin hora (check-out es siempre a las 11:00).
   DateTimeColumn get checkOutDate => dateTime()();
 
-  TextColumn get status =>
-      textEnum<ReservationStatus>().withDefault(
-        Constant(ReservationStatus.pending.name),
-      )();
+  TextColumn get status => textEnum<ReservationStatus>().withDefault(
+    Constant(ReservationStatus.pending.name),
+  )();
 
   /// Precio final de la reserva, en centavos. Parte de un cálculo
   /// automático (tarifa x personas x noches por habitación) pero es
@@ -26,6 +25,11 @@ class Reservations extends Table {
   IntColumn get totalPriceCents => integer()();
 
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
+
+  /// Pedidos especiales (ej. "desayuno a las 7") o el motivo de un ajuste
+  /// manual al precio final (ej. auto adicional, multa) — ver
+  /// docs/DECISIONS.md.
+  TextColumn get notes => text().nullable()();
 
   @override
   Set<Column> get primaryKey => {id};
