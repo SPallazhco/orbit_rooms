@@ -3,6 +3,7 @@ class RoutesNames {
   static const String properties = "/properties";
   static const String rooms = "/rooms";
   static const String guests = "/guests";
+  static const String quotes = "/quotes";
   static const String reservations = "/reservations";
   static const String calendar = "/calendar";
   static const String reports = "/reports";

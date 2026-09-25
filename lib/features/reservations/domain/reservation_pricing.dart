@@ -1,20 +1,23 @@
-/// Suma, por cada noche entre [checkInDate] (incluida) y [checkOutDate]
-/// (excluida), la tarifa por persona correspondiente x [guestsCount].
-/// Prioridad de tarifa por noche: feriado (si la fecha está en
-/// [holidayDates]) > fin de semana (viernes, sábado, domingo) > entre
-/// semana. Un feriado que cae en fin de semana se cobra como feriado, no
-/// como fin de semana (PRD 5.2/5.4/5.10). Función pura: no toca la base de
-/// datos.
-int calculateSubtotalCents({
+typedef DayRate = ({DateTime date, int rateCents});
+
+/// Para cada noche entre [checkInDate] (incluida) y [checkOutDate]
+/// (excluida), la tarifa por persona correspondiente esa noche. Prioridad:
+/// feriado (si la fecha está en [holidayDates]) > fin de semana (viernes,
+/// sábado, domingo) > entre semana. Un feriado que cae en fin de semana se
+/// cobra como feriado, no como fin de semana (PRD 5.2/5.4/5.10). Función
+/// pura: no toca la base de datos. Reutilizada por Reservations (suma un
+/// subtotal, ver [calculateSubtotalCents]) y por Quotes (PRD 5.4
+/// extendido — cada noche es una línea editable, ver
+/// docs/DECISIONS.md).
+List<DayRate> dayRatesForStay({
   required int ratePerPersonWeekdayCents,
   required int ratePerPersonWeekendCents,
   required int ratePerPersonHolidayCents,
   required DateTime checkInDate,
   required DateTime checkOutDate,
-  required int guestsCount,
   Set<DateTime> holidayDates = const {},
 }) {
-  var subtotalCents = 0;
+  final rates = <DayRate>[];
   for (
     var night = checkInDate;
     night.isBefore(checkOutDate);
@@ -30,7 +33,30 @@ int calculateSubtotalCents({
         ? ratePerPersonHolidayCents
         : (isWeekend ? ratePerPersonWeekendCents : ratePerPersonWeekdayCents);
 
-    subtotalCents += rateCents * guestsCount;
+    rates.add((date: night, rateCents: rateCents));
   }
-  return subtotalCents;
+  return rates;
+}
+
+/// Suma, por cada noche entre [checkInDate] (incluida) y [checkOutDate]
+/// (excluida), la tarifa por persona correspondiente x [guestsCount]. Ver
+/// [dayRatesForStay] para la regla de qué tarifa aplica cada noche.
+int calculateSubtotalCents({
+  required int ratePerPersonWeekdayCents,
+  required int ratePerPersonWeekendCents,
+  required int ratePerPersonHolidayCents,
+  required DateTime checkInDate,
+  required DateTime checkOutDate,
+  required int guestsCount,
+  Set<DateTime> holidayDates = const {},
+}) {
+  final rates = dayRatesForStay(
+    ratePerPersonWeekdayCents: ratePerPersonWeekdayCents,
+    ratePerPersonWeekendCents: ratePerPersonWeekendCents,
+    ratePerPersonHolidayCents: ratePerPersonHolidayCents,
+    checkInDate: checkInDate,
+    checkOutDate: checkOutDate,
+    holidayDates: holidayDates,
+  );
+  return rates.fold(0, (sum, day) => sum + day.rateCents * guestsCount);
 }

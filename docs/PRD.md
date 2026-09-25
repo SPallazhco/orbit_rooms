@@ -37,6 +37,8 @@ instalación de la app al mismo tiempo (ver sección 6, Usuarios).
 - Gestión de **múltiples propiedades** (hostales/casas) por instalación.
 - Gestión de **habitaciones** por propiedad (tipo, capacidad, precio, estado).
 - Gestión de **huéspedes** como entidad con historial propio.
+- **Cotizaciones** previas a la reserva (día por día, con recordatorio local
+  para recontactar a un posible huésped que no respondió) — ver sección 5.3bis.
 - Gestión de **reservas**: crear, confirmar, check-in, check-out, cancelar.
 - Registro de **pago básico** por reserva (monto, método, estado).
 - **Vehículos por reserva** (placa): el garaje es una fortaleza real del
@@ -55,7 +57,9 @@ instalación de la app al mismo tiempo (ver sección 6, Usuarios).
 - Autenticación y roles de usuario (dueño vs recepcionista vs empleado).
 - Panel web administrativo.
 - Facturación electrónica, integraciones de pasarela de pago.
-- Notificaciones/recordatorios automáticos.
+- Notificaciones/recordatorios automáticos en general — **excepto** el
+  recordatorio local de cotizaciones pendientes (sección 5.3bis), que sí
+  entró al alcance a partir de un caso real.
 - Reportes avanzados / analítica.
 
 Estos puntos están fuera del MVP pero **influyen decisiones técnicas de
@@ -75,6 +79,8 @@ futura, y modelo de `Property` ya preparado para más de una).
 | **ReservationRoom** (Habitación asignada) | Línea dentro de una `Reservation`: qué `Room` se asignó y cuántas personas de ese grupo se alojan ahí. Una reserva de 1 sola habitación tiene exactamente una línea. |
 | **Payment** (Pago) | Registro de pago asociado a una `Reservation` completa (el grupo), no a una habitación individual: monto, método, estado. Una reserva puede tener uno o más pagos (pago parcial). |
 | **Vehicle** (Vehículo) | Placa de un auto declarado para una `Reservation` (el garaje incluido es una fortaleza real del negocio). Un huésped puede declarar más de un vehículo. Atado a la reserva, y por lo tanto al huésped vía `Reservation.guestId`. |
+| **Quote** (Cotización) | El flujo previo a la reserva: un posible huésped contacta (a veces sin dar ni el nombre) y la administradora arma un presupuesto día por día antes de que exista un `Guest` real. Vive con estado propio (`pending`/`reserved`/`rejected`) y, si acepta, se convierte en una `Reservation` real. Entidad separada de `Reservation`, no una reutilización (ver sección 5.3bis). |
+| **QuoteDayLine** (Línea de cotización) | Una fila por noche dentro de una `Quote`: tarifa de adulto y de niño para esa fecha puntual, ambas editables a mano (la tarifa de niño no tiene default automático, se decide caso a caso). |
 
 Relaciones:
 
@@ -85,6 +91,9 @@ Reservation (1) ── (N) ReservationRoom ── (N:1) Room
 Reservation (1) ── (N) Vehicle
 Guest    (1) ──── (N) Reservation
 Reservation (1) ── (N) Payment
+Quote (N:1) Property, Quote (N:1) Room
+Quote (1) ── (N) QuoteDayLine
+Quote (0..1) ── (0..1) Reservation (al convertirla)
 ```
 
 ## 5. Requerimientos funcionales por módulo
@@ -140,6 +149,52 @@ Los módulos coinciden con las features ya creadas en `lib/features/`.
   huésped se hace desde ahí (ícono junto al nombre), no desde la lista —
   a diferencia de `Property`/`Room`, que no tienen un "detalle" propio y
   se editan directo al tocarlas en su lista.
+
+### 5.3bis Cotizaciones (Quotes) ✅ implementado
+
+A partir de una reunión real con la administradora de Hospedaje Shejiná
+(ver [DECISIONS.md](DECISIONS.md)): el negocio real empieza antes de que
+exista una reserva. Un posible huésped contacta por WhatsApp — muchas
+veces sin dar ni el nombre — y la administradora arma y envía un
+presupuesto detallado, día por día, antes de saber quién es. Forzar esto
+dentro de `Reservation` no funciona porque `guestId` es obligatorio ahí;
+por eso `Quote` es una entidad separada.
+
+- Crear cotización: elegir habitación (una sola, no multi-habitación como
+  `Reservation`) → fechas de check-in/check-out → cantidad de adultos y
+  niños → nombre/contacto del posible huésped (**ambos opcionales** — a
+  veces no hay ni el nombre).
+- El sistema arma una `QuoteDayLine` por noche con la tarifa de adulto
+  precargada según la regla ya existente (entre semana/fin de
+  semana/feriado). La tarifa de niño **no tiene default automático**
+  (arranca en 0): es una decisión caso a caso de la administradora, que
+  puede variar día a día dentro de la misma cotización (ej. cobrar $10 el
+  primer día y $7 el último). **Ambas tarifas —adulto y niño— son
+  editables a mano por noche**, no solo al crear.
+- Depósito sugerido: mitad del total calculado, editable a mano.
+- **Estado de la cotización:** `pending` (recién creada) → `reserved`
+  (se convirtió en una reserva real) o `rejected` (el huésped no
+  respondió o no aceptó). El único camino a `reserved` es convertir la
+  cotización en reserva real (no es un simple cambio de estado manual).
+- **Recordatorio local:** si la cotización sigue `pending` cerca del
+  check-in, la app dispara una notificación local para que la
+  administradora vuelva a contactar al posible huésped (ej. "María
+  cotizó para el 5 de noviembre"). Los días de anticipación son
+  **configurables en Configuración general** (no fijos, no por
+  cotización — ver sección 5.9). El recordatorio se cancela solo si la
+  cotización deja de estar `pending` (se rechaza o se convierte), y se
+  reprograma si se reactiva.
+- **Compartir como imagen:** la cotización se puede compartir por
+  WhatsApp como una imagen tipo tabla (desglose día por día, total,
+  depósito/saldo, horario de check-in/check-out) — fiel al formato que la
+  administradora ya usa a mano, no como texto plano.
+- **Convertir en reserva:** al aceptar, se piden los datos completos del
+  huésped (mismos campos que `Guest`) y se crea una `Reservation` real
+  usando **el precio ya calculado en la cotización** (posiblemente
+  editado a mano), sin recalcular nada. La cotización queda ligada a la
+  reserva resultante (`Quote.reservationId`).
+- Fechas, habitación y propiedad **no son editables** después de creada
+  la cotización — si cambian, se crea una cotización nueva.
 
 ### 5.4 Reservations
 
@@ -251,6 +306,10 @@ repartido en 2-3 habitaciones según capacidad disponible).
   manualmente desde `SettingsPage`. Afectan el precio de cualquier
   habitación de cualquier propiedad ese día (ver sección 5.2/5.4 y
   [DECISIONS.md](DECISIONS.md)).
+- **Recordatorio de cotizaciones:** días de anticipación (sobre el
+  check-in) para el aviso de "recontactar" una cotización que sigue
+  `pending` (sección 5.3bis). Un solo valor global, no por cotización;
+  editable desde `SettingsPage`.
 
 ### 5.10 Horarios de check-in / check-out
 
@@ -336,6 +395,13 @@ no estaba contemplada en la pregunta 3 — se agregó `Holiday` y
 `ratePerPersonHoliday`. El PRD es un documento vivo: esto es exactamente el
 tipo de ajuste que se espera que seguir apareciendo con más información
 real.
+
+Segunda **revisión post-v1** (2026-09-25): una reunión real con la
+administradora mostró que el flujo de negocio empieza antes de la reserva
+(ver sección 5.3bis y [DECISIONS.md](DECISIONS.md)) — se agregó la
+feature completa de Cotizaciones (`Quote`/`QuoteDayLine`), con
+recordatorio local y compartir por imagen. Mismo criterio que la revisión
+anterior: información real de un hostal real, no una hipótesis.
 
 ## 9. Ideas futuras (fuera de alcance, no perder de vista)
 

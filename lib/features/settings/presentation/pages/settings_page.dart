@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:orbit_rooms/core/settings/settings_providers.dart';
 import 'package:orbit_rooms/features/settings/presentation/widgets/add_holiday_dialog.dart';
 import 'package:orbit_rooms/features/settings/presentation/widgets/edit_currency_dialog.dart';
+import 'package:orbit_rooms/features/settings/presentation/widgets/edit_quote_reminder_days_dialog.dart';
 import 'package:orbit_rooms/shared/widgets/app_drawer.dart';
 
 String _formatDate(DateTime d) =>
@@ -15,6 +16,7 @@ class SettingsPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final currencyAsync = ref.watch(currencyProvider);
     final holidaysAsync = ref.watch(holidaysProvider);
+    final reminderDaysAsync = ref.watch(quoteReminderDaysProvider);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Configuración')),
@@ -32,6 +34,20 @@ class SettingsPage extends ConsumerWidget {
               icon: const Icon(Icons.edit_outlined),
               onPressed: () =>
                   _editCurrency(context, ref, currencyAsync.value ?? 'USD'),
+            ),
+          ),
+          const Divider(height: 32),
+          ListTile(
+            title: const Text('Recordatorio de cotizaciones'),
+            subtitle: reminderDaysAsync.when(
+              loading: () => const Text('Cargando...'),
+              error: (error, _) => Text('Error: $error'),
+              data: (days) => Text('$days días antes del check-in'),
+            ),
+            trailing: IconButton(
+              icon: const Icon(Icons.edit_outlined),
+              onPressed: () =>
+                  _editReminderDays(context, ref, reminderDaysAsync.value ?? 3),
             ),
           ),
           const Divider(height: 32),
@@ -99,6 +115,20 @@ class SettingsPage extends ConsumerWidget {
     if (currency == null) return;
 
     await ref.read(appSettingsRepositoryProvider).setCurrency(currency);
+  }
+
+  Future<void> _editReminderDays(
+    BuildContext context,
+    WidgetRef ref,
+    int currentDays,
+  ) async {
+    final days = await showDialog<int>(
+      context: context,
+      builder: (_) => EditQuoteReminderDaysDialog(currentDays: currentDays),
+    );
+    if (days == null) return;
+
+    await ref.read(appSettingsRepositoryProvider).setQuoteReminderDays(days);
   }
 
   Future<void> _addHoliday(BuildContext context, WidgetRef ref) async {

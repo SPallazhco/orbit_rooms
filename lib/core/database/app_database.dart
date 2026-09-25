@@ -11,13 +11,17 @@ import 'tables/guests_table.dart';
 import 'tables/holidays_table.dart';
 import 'tables/payments_table.dart';
 import 'tables/properties_table.dart';
+import 'tables/quote_day_lines_table.dart';
+import 'tables/quotes_table.dart';
 import 'tables/reservation_rooms_table.dart';
 import 'tables/reservations_table.dart';
 import 'tables/room_types_table.dart';
 import 'tables/rooms_table.dart';
 import 'tables/vehicles_table.dart';
+import 'app_database.steps.dart';
 
 export 'tables/payments_table.dart' show PaymentMethod;
+export 'tables/quotes_table.dart' show QuoteStatus;
 export 'tables/reservations_table.dart' show ReservationStatus;
 
 part 'app_database.g.dart';
@@ -34,6 +38,8 @@ part 'app_database.g.dart';
     AppSettings,
     Holidays,
     Vehicles,
+    Quotes,
+    QuoteDayLines,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -44,10 +50,20 @@ class AppDatabase extends _$AppDatabase {
   factory AppDatabase.connect() => AppDatabase(_openConnection());
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
+    onUpgrade: stepByStep(
+      from1To2: (m, schema) async {
+        await m.createTable(schema.quotes);
+        await m.createTable(schema.quoteDayLines);
+        await m.addColumn(
+          schema.appSettings,
+          schema.appSettings.quoteReminderDays,
+        );
+      },
+    ),
     beforeOpen: (details) async {
       await customStatement('PRAGMA foreign_keys = ON;');
     },

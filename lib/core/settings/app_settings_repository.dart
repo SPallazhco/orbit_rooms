@@ -32,4 +32,28 @@ class AppSettingsRepository {
           currency: Value(currencyCode),
         ),
       );
+
+  /// Días de anticipación para el recordatorio de "recontactar" una
+  /// cotización pendiente (PRD 5.4 extendido) — un solo valor global, no
+  /// por cotización, ver docs/DECISIONS.md.
+  Future<int> getQuoteReminderDays() async {
+    final row = await (_db.select(
+      _db.appSettings,
+    )..where((s) => s.id.equals(_settingsId))).getSingleOrNull();
+    return row?.quoteReminderDays ?? 3;
+  }
+
+  Stream<int> watchQuoteReminderDays() =>
+      (_db.select(_db.appSettings)..where((s) => s.id.equals(_settingsId)))
+          .watchSingleOrNull()
+          .map((row) => row?.quoteReminderDays ?? 3);
+
+  Future<void> setQuoteReminderDays(int days) => _db
+      .into(_db.appSettings)
+      .insertOnConflictUpdate(
+        AppSettingsCompanion.insert(
+          id: const Value(_settingsId),
+          quoteReminderDays: Value(days),
+        ),
+      );
 }

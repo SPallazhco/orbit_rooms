@@ -1356,3 +1356,217 @@ el ícono de editar abrió el formulario con todos los campos precargados.
 **Estado:** vigente. Con esto, las 7 features del scaffold original más
 `Configuración` tienen UI real y completa — no queda ningún punto
 pendiente del PRD anotado en esta revisión de alto.
+
+---
+
+## 2026-05-22 — Migraciones de esquema reales: cerrando la deuda técnica más riesgosa
+
+**Contexto:** desde hace varias sesiones, `AppDatabase` vive con
+`schemaVersion => 1` y sin `onUpgrade`. Cada vez que se agregó una tabla o
+columna (feriados/vehículos, `Reservations.notes`), la app quedaba
+colgada al abrir sobre un `.sqlite` de dispositivo ya existente, y la
+"solución" era desinstalar la app del simulador. Eso es aceptable
+**solo** porque hoy no hay datos reales en ningún dispositivo — en cuanto
+la administradora real instale esto en su teléfono, el próximo cambio de
+schema sin una migración de verdad le borraría todo. Era, con diferencia,
+el ítem de deuda técnica de mayor riesgo del proyecto.
+
+**Decisión — usar las herramientas oficiales de `drift_dev`, no armar algo
+a mano:** Drift ya trae un flujo completo pensado exactamente para esto
+(`dart run drift_dev make-migrations`), que:
+1. Guarda una foto congelada (`drift_schema_vN.json`) del schema en cada
+   versión — **se commitea**, es la fuente de verdad de "cómo era el
+   schema en la versión N", no un archivo de build.
+2. Genera un helper `stepByStep` (`app_database.steps.dart`, generado, no
+   se edita a mano) con un método `fromXToY` por cada salto de versión que
+   falte completar.
+3. Genera un test (`test/drift/app_database/migration_test.dart`) que
+   arranca una base en la versión vieja, corre la migración real de
+   `AppDatabase`, y verifica que el schema resultante coincide exactamente
+   con la foto de la versión nueva — más una plantilla para probar que los
+   datos existentes sobreviven la migración, no solo el schema.
+
+No se armó un sistema propio de migraciones porque Drift ya resuelve esto
+mejor de lo que se haría a mano, y es la herramienta que sus propios
+mantenedores esperan que se use — coherente con "no reinventar lo que ya
+existe".
+
+**Setup hecho en esta sesión:**
+- `build.yaml` (nuevo, raíz del proyecto): declara `app_database:
+  lib/core/database/app_database.dart` para que `drift_dev` sepa qué base
+  de datos versionar.
+- `drift_schemas/app_database/drift_schema_v1.json` (nuevo, commiteado):
+  la foto del schema actual, congelada como "versión 1" — coincide con el
+  `schemaVersion => 1` de hoy, no con ninguna versión histórica anterior
+  (no hacía falta reconstruir el historial real de cambios pasados; la
+  versión 1 es, por definición, "el schema tal como está ahora mismo").
+
+**Verificación de extremo a extremo (no solo se configuró, se probó que
+funciona):** se simuló un cambio real y completo, y se revirtió después:
+1. Se agregó una columna de prueba (`AppSettings.migrationProbe`,
+   nullable) y se subió `schemaVersion` a 2.
+2. `dart run drift_dev make-migrations` generó
+   `app_database.steps.dart` (con el `stepByStep(from1To2: ...)` a
+   completar) y `test/drift/app_database/migration_test.dart`.
+3. Se completó el paso con `m.addColumn(schema.appSettings,
+   schema.appSettings.migrationProbe)` y se conectó a
+   `MigrationStrategy.onUpgrade`.
+4. `flutter test test/drift/app_database/migration_test.dart` —
+   **pasó**: tanto el test de "el schema resultante es correcto" como el
+   de "la migración no corrompe datos".
+5. Se revirtió todo (columna, `schemaVersion`, el `onUpgrade`, y los
+   archivos generados de la v2) y se confirmó con `git diff` que los
+   archivos de `AppDatabase` quedaron byte-a-byte iguales al commit
+   anterior, y que `flutter analyze`/`flutter test` (48 tests) siguen en
+   verde.
+
+**El procedimiento para cualquier cambio de schema futuro queda así**
+(reemplaza "desinstalar y reinstalar" definitivamente):
+1. Editar la tabla (agregar columna/tabla, etc.) en `core/database/tables/`.
+2. Subir `schemaVersion` en `AppDatabase` (+1, nunca saltar versiones).
+3. Correr `dart run build_runner build` (regenera `app_database.g.dart`
+   con el schema nuevo).
+4. Correr `dart run drift_dev make-migrations` — genera/actualiza
+   `drift_schemas/app_database/drift_schema_vN.json`,
+   `app_database.steps.dart` y el test de migración.
+5. Completar el `stepByStep` generado (ej. `m.addColumn(...)`,
+   `m.createTable(...)`) y conectarlo en `MigrationStrategy.onUpgrade`.
+6. Correr `flutter test test/drift/app_database/migration_test.dart` —
+   si falla, el paso de migración está mal escrito, corregir ahí antes de
+   seguir.
+7. Commitear el schema nuevo (`drift_schemas/`) junto con el código.
+
+**Estado:** vigente. Este es el ítem de deuda técnica de mayor riesgo ya
+resuelto. Quedan dos ítems menores anotados (no bloqueantes): (a) sin
+`testWidgets` en ningún lado — sigue siendo una limitación aceptada de
+Drift+Riverpod+`flutter_test`, no algo que este cambio resuelva; (b) sin
+CI (GitHub Actions) corriendo `flutter analyze`/`flutter test`
+automáticamente en cada push.
+
+---
+
+## 2026-09-25 — Cotizaciones (Quotes): flujo previo a la reserva, a partir de una reunión real
+
+**Contexto:** una reunión con la administradora de Hospedaje Shejiná (misma
+fuente del caso real del garaje) mostró que el flujo de negocio real
+empieza antes de que exista una `Reservation`. Un posible huésped contacta
+por WhatsApp — muchas veces sin dar ni el nombre — y la administradora
+arma y envía una cotización detallada, día por día, con una tarifa
+especial y variable para niños (ej. $10 un día, $7 otro, a su criterio).
+Solo si el huésped acepta se piden los datos completos. La administradora
+además pidió que la cotización **se guarde**, porque quiere un aviso unos
+días antes del check-in para recontactar a quien cotizó y no respondió —
+un flujo con estado (`Pendiente` → `Aprobada/reservada`, más `Rechazada`).
+
+Nota de higiene de la rama: al momento de esta reunión ya existían en
+`feature/cotizacion` 4 archivos con cambios manuales de texto
+(`Reservas`→`Cotizacion`, `Pagos`→`Abono` en las páginas de reservas y en
+`AppDrawer`) hechos como prototipo exploratorio antes de decidir el
+diseño. Se revirtieron esos 4 labels a su texto original al arrancar la
+implementación real, porque Cotizaciones terminó siendo una feature
+separada, no una re-etiquetada de Reservas.
+
+**Decisión 1 — `Quote`/`QuoteDayLine` como entidad separada, no reutilizar
+`Reservation`:** `Reservation.guestId` es obligatorio y se usa en `join`
+por Dashboard, Calendar y Reports. Relajarlo para admitir "sin huésped
+todavía" habría roto ese supuesto en tres pantallas ya existentes. Una
+`Quote` vive con `guestName`/`guestContact` como texto libre nullable (no
+FK a `Guest`), una sola habitación (el caso real es así, a diferencia de
+`Reservation` que admite varias vía `ReservationRoom`), y una
+`QuoteDayLine` por noche con tarifas de adulto y niño **ambas editables a
+mano** — no solo la de niño: la administradora pidió poder ajustar
+también la de adulto.
+
+**Decisión 2 — reusar `dayRatesForStay`, no duplicar la regla de
+tarifas:** se extrajo la clasificación noche-por-noche (feriado/fin de
+semana/entre semana) que ya vivía dentro de
+`calculateSubtotalCents` a una función propia en
+`features/reservations/domain/reservation_pricing.dart`.
+`calculateSubtotalCents` se reconstruyó sobre `dayRatesForStay` sin
+cambiar su comportamiento (cubierto por los tests existentes, que no se
+tocaron), y `QuoteRepository.create()` importa `dayRatesForStay` desde el
+dominio de Reservations — reuso cruzado de dominio, no una copia de la
+regla de negocio en Quotes.
+
+**Decisión 3 — convertir en reserva reusa `overrideTotalPrice`, no
+recalcula nada:** al aceptar una cotización, se crea el `Guest` real, se
+llama `ReservationRepository.createGroupReservation()` (para la
+validación de solapamiento y una `ReservationRoom`) y **inmediatamente**
+se fuerza el total con `overrideTotalPrice` al valor ya calculado (y
+posiblemente editado a mano) de la cotización — el mismo mecanismo que ya
+existía desde el descuento de niños en Reservations, sin construir un
+camino de creación de reserva nuevo.
+
+**Decisión 4 — recordatorio local, no una integración con WhatsApp:**
+`flutter_local_notifications` + `timezone`, nuevas dependencias — la app
+no tenía ningún tipo de notificación hasta ahora, pero acá resuelven un
+problema real y explícito (recontactar leads fríos), no algo especulativo.
+`core/notifications/notification_service.dart`:
+- **Zona horaria fija `America/Guayaquil`**, no detectada del
+  dispositivo: la app es para un hostal real en Cuenca, Ecuador (sin
+  horario de verano) — agregar `flutter_timezone` para detectar la zona
+  del dispositivo sería resolver un problema de multi-zona que hoy no
+  existe.
+- **Id de notificación derivado de `quoteId.hashCode & 0x7FFFFFFF`**, no
+  una columna nueva en `Quotes` — el id es reproducible a partir del
+  `quoteId` que ya se tiene, así que no hace falta persistir nada extra
+  para poder cancelarlo después.
+- **`AndroidScheduleMode.inexactAllowWhileIdle`**, no `exactAllowWhileIdle`:
+  el aviso es "unos días antes", no necesita precisión al minuto, y así se
+  evita pedirle a la usuaria el permiso especial de alarmas exactas de
+  Android 12+.
+- **Cancelar/reprogramar vive en la capa de páginas, no en
+  `QuoteRepository`:** el repository no debería depender de un plugin de
+  plataforma. `CreateQuotePage` programa el aviso tras `create()`;
+  `QuoteDetailPage` lo cancela al rechazar o convertir, y lo reprograma al
+  reactivar una cotización rechazada.
+- **`quoteReminderDays` configurable en `AppSettings`** (default 3, mismo
+  patrón que `currency`), no hardcodeado — la administradora decide con
+  cuánta anticipación quiere el aviso.
+
+**Decisión 5 — compartir como imagen, no como texto:** el pedido explícito
+fue "una imagen tipo tabla, como la de la reunión". `QuoteShareCard`
+reproduce esa tabla con colores fijos (blanco/negro, no
+`Theme.of(context)`) para que se vea igual sin importar el tema de quien
+la recibe. Se captura con `RepaintBoundary` + `toImage(pixelRatio: 3)` →
+PNG → archivo temporal (`path_provider`, ya era dependencia) →
+`share_plus` (nueva) abre la hoja de compartir nativa. **La tarjeta se
+renderiza visible en pantalla (`QuoteSharePreviewPage`), no oculta o
+fuera de la vista:** `RenderRepaintBoundary.toImage()` necesita que la
+subrama ya haya pasado por paint al menos una vez; un widget nunca
+pintado (offstage) captura en blanco.
+
+**Migración de schema — primer uso real del flujo del paso 10.12:**
+`schemaVersion` 1→2, tablas `Quotes`/`QuoteDayLines` nuevas + columna
+`AppSettings.quoteReminderDays`, generado con
+`dart run drift_dev make-migrations` y validado con el test de migración
+generado (`test/drift/app_database/migration_test.dart`) — a diferencia
+de la prueba de extremo a extremo de 10.12 (que se revirtió), esta
+migración **sí queda**, es el cambio real que el mecanismo estaba
+esperando.
+
+**Fricción de testing encontrada (no un bug de la app):** durante la
+prueba manual en simulador, varios taps sobre el FAB de `QuotesPage`
+"fallaban" silenciosamente (no navegaban) porque las coordenadas se
+calcularon a partir de píxeles del screenshot sin descontar el inset de
+zona segura inferior (~34pt del home indicator) — el FAB real estaba más
+abajo de lo que parecía. Se confirmó con el mismo FAB en `ReservationsPage`
+(código sin tocar) fallando igual con las mismas coordenadas mal
+calculadas, y funcionando con el ajuste. Separado: tocar la notificación
+del sistema (no un widget de la app) no se pudo verificar de punta a
+punta con las herramientas de automatización del simulador — el tap
+sintético cierra el banner pero no dispara `onDidReceiveNotificationResponse`
+de forma confiable; el código del callback sigue el patrón documentado
+del plugin y no mostró errores en ningún intento.
+
+**Estado:** vigente. Probado con tests de `dayRatesForStay`,
+`quote_repository_test.dart`, `quotes_providers_test.dart`, y el test de
+migración generado (todos verdes, 58 tests en total). Probado a mano en
+simulador de punta a punta: crear cotización → precio día-por-día
+correcto → editar tarifa de una noche → compartir por WhatsApp (imagen
+PNG válida en la hoja de compartir) → convertir en reserva (aparece en
+`ReservationsPage` con el precio exacto de la cotización) → el
+recordatorio dispara con el contenido correcto (verificado 3 veces
+acortando temporalmente el lead time a 20s, revertido antes de terminar)
+→ rechazar cancela el aviso, reactivar lo reprograma, sin errores en
+consola en ningún paso.

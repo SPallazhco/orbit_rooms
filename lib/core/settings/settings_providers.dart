@@ -22,3 +22,8 @@ final currencyProvider = StreamProvider<String>(
 final holidaysProvider = StreamProvider<List<Holiday>>(
   (ref) => ref.watch(holidayRepositoryProvider).watchAll(),
 );
+
+/// Estado reactivo, mismo patrón que `activePropertiesProvider`.
+final quoteReminderDaysProvider = StreamProvider<int>(
+  (ref) => ref.watch(appSettingsRepositoryProvider).watchQuoteReminderDays(),
+);

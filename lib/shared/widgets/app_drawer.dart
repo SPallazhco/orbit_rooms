@@ -31,6 +31,11 @@ class AppDrawer extends StatelessWidget {
             onTap: () => Navigator.pushNamed(context, RoutesNames.guests),
           ),
           ListTile(
+            leading: const Icon(Icons.request_quote_outlined),
+            title: const Text("Cotizaciones"),
+            onTap: () => Navigator.pushNamed(context, RoutesNames.quotes),
+          ),
+          ListTile(
             leading: const Icon(Icons.event_available),
             title: const Text("Reservas"),
             onTap: () => Navigator.pushNamed(context, RoutesNames.reservations),

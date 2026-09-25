@@ -101,4 +101,36 @@ void main() {
       expect(subtotal, 2000);
     });
   });
+
+  group('dayRatesForStay', () {
+    test('devuelve una línea por noche con la tarifa que corresponde a cada '
+        'una (usada por Quotes para el desglose día por día)', () {
+      final rates = dayRatesForStay(
+        ratePerPersonWeekdayCents: 1200,
+        ratePerPersonWeekendCents: 1500,
+        ratePerPersonHolidayCents: 2000,
+        checkInDate: DateTime(2026, 6, 4), // jueves
+        checkOutDate: DateTime(2026, 6, 7), // domingo (excluido)
+        holidayDates: {DateTime(2026, 6, 5)}, // viernes feriado
+      );
+
+      expect(rates, [
+        (date: DateTime(2026, 6, 4), rateCents: 1200), // jueves
+        (date: DateTime(2026, 6, 5), rateCents: 2000), // viernes feriado
+        (date: DateTime(2026, 6, 6), rateCents: 1500), // sábado
+      ]);
+    });
+
+    test('una estadía de 0 noches devuelve una lista vacía', () {
+      final rates = dayRatesForStay(
+        ratePerPersonWeekdayCents: 1200,
+        ratePerPersonWeekendCents: 1500,
+        ratePerPersonHolidayCents: 2000,
+        checkInDate: DateTime(2026, 6, 1),
+        checkOutDate: DateTime(2026, 6, 1),
+      );
+
+      expect(rates, isEmpty);
+    });
+  });
 }
