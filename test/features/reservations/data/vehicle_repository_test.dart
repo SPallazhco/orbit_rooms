@@ -58,4 +58,20 @@ void main() {
 
     expect(await repository.getForReservation(reservationId), isEmpty);
   });
+
+  test('garageFeeCents es null por defecto y se puede editar después '
+      '(comisión de garaje, PRD 9)', () async {
+    final id = await repository.create(
+      reservationId: reservationId,
+      plate: 'ABC123',
+    );
+
+    var vehicles = await repository.getForReservation(reservationId);
+    expect(vehicles.single.garageFeeCents, null);
+
+    await repository.updateGarageFee(id, 350);
+
+    vehicles = await repository.getForReservation(reservationId);
+    expect(vehicles.single.garageFeeCents, 350);
+  });
 }

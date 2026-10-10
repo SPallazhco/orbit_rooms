@@ -6,6 +6,7 @@ import 'package:orbit_rooms/core/database/app_database.dart';
 import 'package:orbit_rooms/core/database/database_providers.dart';
 import 'package:orbit_rooms/features/reports/reports_providers.dart';
 import 'package:orbit_rooms/features/reservations/data/reservation_repository.dart';
+import 'package:orbit_rooms/features/reservations/data/vehicle_repository.dart';
 
 /// `reportDataProvider` combina 3 `StreamProvider`s: cada uno necesita su
 /// propia vuelta del event loop para emitir su primer valor tras un cambio
@@ -130,5 +131,232 @@ void main() {
     expect(report.totalRoomNights, 8);
     expect(report.occupiedRoomNights, 3);
     expect(report.incomeCents, 5000);
+  });
+
+  test('garageReportProvider trae solo los vehículos de reservas activas ese '
+      'día, con huésped/celular/casa+habitación/placa', () async {
+    const propertyId = 'property-a';
+    const roomTypeId = 'room-type';
+    const roomId = 'room-a';
+    const activeGuestId = 'guest-active';
+    const otherGuestId = 'guest-other';
+
+    await db
+        .into(db.properties)
+        .insert(
+          PropertiesCompanion.insert(
+            id: Value(propertyId),
+            name: 'Hospedaje Shejina',
+          ),
+        );
+    await db
+        .into(db.roomTypes)
+        .insert(RoomTypesCompanion.insert(id: Value(roomTypeId), name: 'Tipo'));
+    await db
+        .into(db.rooms)
+        .insert(
+          RoomsCompanion.insert(
+            id: Value(roomId),
+            propertyId: propertyId,
+            roomTypeId: roomTypeId,
+            name: 'Habitacion 1',
+            capacity: 4,
+            ratePerPersonWeekdayCents: 1200,
+            ratePerPersonWeekendCents: 1500,
+            ratePerPersonHolidayCents: 2000,
+          ),
+        );
+    await db
+        .into(db.guests)
+        .insert(
+          GuestsCompanion.insert(
+            id: Value(activeGuestId),
+            fullName: 'Maria Torres',
+            phone: const Value('0999999999'),
+          ),
+        );
+    await db
+        .into(db.guests)
+        .insert(
+          GuestsCompanion.insert(
+            id: Value(otherGuestId),
+            fullName: 'Huesped Pasado',
+          ),
+        );
+
+    final reservationRepository = ReservationRepository(db);
+
+    // Reserva activa el día del reporte: su vehículo sí debe aparecer.
+    final activeReservationId = await reservationRepository
+        .createGroupReservation(
+          guestId: activeGuestId,
+          checkInDate: DateTime(2026, 6, 10),
+          checkOutDate: DateTime(2026, 6, 12),
+          roomAssignments: [
+            RoomAssignmentInput(roomId: roomId, guestsCount: 2),
+          ],
+        );
+    await db
+        .into(db.vehicles)
+        .insert(
+          VehiclesCompanion.insert(
+            id: const Value('vehicle-active'),
+            reservationId: activeReservationId,
+            plate: 'ABC123',
+          ),
+        );
+
+    // Reserva ya terminada antes del día del reporte: su vehículo no
+    // debe aparecer.
+    final pastReservationId = await reservationRepository
+        .createGroupReservation(
+          guestId: otherGuestId,
+          checkInDate: DateTime(2026, 6, 1),
+          checkOutDate: DateTime(2026, 6, 3),
+          roomAssignments: [
+            RoomAssignmentInput(roomId: roomId, guestsCount: 1),
+          ],
+        );
+    await db
+        .into(db.vehicles)
+        .insert(
+          VehiclesCompanion.insert(
+            id: const Value('vehicle-past'),
+            reservationId: pastReservationId,
+            plate: 'xyz789',
+          ),
+        );
+
+    final day = DateTime(2026, 6, 11);
+    container.listen(garageReportProvider(day), (_, _) {});
+    await _pump();
+
+    final entries = container.read(garageReportProvider(day)).value!;
+
+    expect(entries.length, 1);
+    expect(entries.single.guestName, 'Maria Torres');
+    expect(entries.single.guestPhone, '0999999999');
+    expect(entries.single.propertyName, 'Hospedaje Shejina');
+    expect(entries.single.roomNames, 'Habitacion 1');
+    expect(entries.single.plate, 'ABC123');
+  });
+
+  test('commissionReportProvider calcula la comisión noche por noche, resta '
+      'el garaje cuando hay auto, ignora reservas canceladas y filtra por '
+      'propiedad', () async {
+    const propertyId = 'casa-norma';
+    const otherPropertyId = 'casa-simon';
+    const roomTypeId = 'room-type';
+    const guestId = 'guest-1';
+
+    await db
+        .into(db.properties)
+        .insert(
+          PropertiesCompanion.insert(id: Value(propertyId), name: 'Norma'),
+        );
+    await db
+        .into(db.properties)
+        .insert(
+          PropertiesCompanion.insert(id: Value(otherPropertyId), name: 'Simón'),
+        );
+    await db
+        .into(db.roomTypes)
+        .insert(RoomTypesCompanion.insert(id: Value(roomTypeId), name: 'Tipo'));
+    await db
+        .into(db.guests)
+        .insert(GuestsCompanion.insert(id: Value(guestId), fullName: 'Carlos'));
+
+    Future<String> addRoom(String id, String name, String forProperty) async {
+      await db
+          .into(db.rooms)
+          .insert(
+            RoomsCompanion.insert(
+              id: Value(id),
+              propertyId: forProperty,
+              roomTypeId: roomTypeId,
+              name: name,
+              capacity: 4,
+              ratePerPersonWeekdayCents: 1200,
+              ratePerPersonWeekendCents: 1200,
+              ratePerPersonHolidayCents: 1200,
+            ),
+          );
+      return id;
+    }
+
+    await addRoom('room-1', 'Habitacion 1', propertyId);
+    await addRoom('room-2', 'Habitacion 2', propertyId);
+    await addRoom('room-3', 'Habitacion 3', propertyId);
+    await addRoom('room-other', 'Habitacion otra casa', otherPropertyId);
+
+    final reservationRepository = ReservationRepository(db);
+    final vehicleRepository = VehicleRepository(db);
+
+    // room-1: 3 huéspedes a $12, sin auto -> tramo $12 (>1) -> $9.
+    await reservationRepository.createGroupReservation(
+      guestId: guestId,
+      checkInDate: DateTime(2026, 6, 1), // lunes
+      checkOutDate: DateTime(2026, 6, 2),
+      roomAssignments: [RoomAssignmentInput(roomId: 'room-1', guestsCount: 3)],
+    );
+
+    // room-2: 2 huéspedes a $12, con un auto de $3.50 de garaje ->
+    // ingreso neto $20.50 -> tramo "$10" -> $5.
+    final room2ReservationId = await reservationRepository
+        .createGroupReservation(
+          guestId: guestId,
+          checkInDate: DateTime(2026, 6, 1),
+          checkOutDate: DateTime(2026, 6, 2),
+          roomAssignments: [
+            RoomAssignmentInput(roomId: 'room-2', guestsCount: 2),
+          ],
+        );
+    await vehicleRepository.create(
+      reservationId: room2ReservationId,
+      plate: 'ABC123',
+      garageFeeCents: 350,
+    );
+
+    // room-3: cancelada -> no debe contarse.
+    final room3ReservationId = await reservationRepository
+        .createGroupReservation(
+          guestId: guestId,
+          checkInDate: DateTime(2026, 6, 1),
+          checkOutDate: DateTime(2026, 6, 2),
+          roomAssignments: [
+            RoomAssignmentInput(roomId: 'room-3', guestsCount: 1),
+          ],
+        );
+    await reservationRepository.updateStatus(
+      room3ReservationId,
+      ReservationStatus.cancelled,
+    );
+
+    // Otra propiedad -> no debe contarse en el reporte de "casa-norma".
+    await reservationRepository.createGroupReservation(
+      guestId: guestId,
+      checkInDate: DateTime(2026, 6, 1),
+      checkOutDate: DateTime(2026, 6, 2),
+      roomAssignments: [
+        RoomAssignmentInput(roomId: 'room-other', guestsCount: 5),
+      ],
+    );
+
+    final params = (
+      propertyId: propertyId,
+      start: DateTime(2026, 6, 1),
+      end: DateTime(2026, 6, 1),
+    );
+    container.listen(commissionReportProvider(params), (_, _) {});
+    await _pump();
+
+    final entries = container.read(commissionReportProvider(params)).value!;
+
+    expect(entries.length, 2);
+    final byRoom = {for (final e in entries) e.roomName: e};
+    expect(byRoom['Habitacion 1']!.commissionCents, 900);
+    expect(byRoom['Habitacion 2']!.commissionCents, 500);
+    expect(byRoom['Habitacion 2']!.garageFeeCents, 350);
+    expect(byRoom.containsKey('Habitacion 3'), false);
   });
 }

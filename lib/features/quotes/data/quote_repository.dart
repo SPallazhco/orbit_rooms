@@ -88,7 +88,15 @@ class QuoteRepository {
 
   /// Reactivo, mismo patrón que `ReservationRepository.watchAll()`: se
   /// actualiza solo al crear/editar/cambiar de estado una cotización.
-  Stream<List<({Quote quote, String propertyName, String roomName})>>
+  /// `ownerName` viaja junto (no solo `propertyName`) para que la UI sepa
+  /// si es la propiedad propia del usuario (`ownerName` vacío) — usado
+  /// para decidir si la imagen de la cotización lleva la marca del
+  /// hostal o no, ver docs/DECISIONS.md.
+  Stream<
+    List<
+      ({Quote quote, String propertyName, String? ownerName, String roomName})
+    >
+  >
   watchAll() {
     final query = _db.select(_db.quotes).join([
       innerJoin(
@@ -103,7 +111,12 @@ class QuoteRepository {
         final quote = row.readTable(_db.quotes);
         final property = row.readTable(_db.properties);
         final room = row.readTable(_db.rooms);
-        return (quote: quote, propertyName: property.name, roomName: room.name);
+        return (
+          quote: quote,
+          propertyName: property.name,
+          ownerName: property.ownerName,
+          roomName: room.name,
+        );
       }).toList(),
     );
   }

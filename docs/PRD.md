@@ -291,6 +291,14 @@ repartido en 2-3 habitaciones según capacidad disponible).
   Selector de rango de fechas con el `showDateRangePicker` nativo de
   Flutter; por defecto, el mes en curso (día 1 hasta hoy). Ver
   [DECISIONS.md](DECISIONS.md).
+- **Reporte de garaje** (idea futura de la sección 9, convertida en
+  feature a pedido de la administradora): lista de vehículos con reserva
+  activa un día puntual (por defecto hoy, con selector de fecha), para
+  compartirla con el dueño del parqueadero — un tercero, no el dueño de
+  la propiedad. Columnas: nombre del huésped, número de celular, casa +
+  habitación y placa del carro. Mismo mecanismo que compartir una
+  cotización: se compone como imagen tipo tabla (no texto plano) y se
+  comparte por WhatsApp con `share_plus`. Ver [DECISIONS.md](DECISIONS.md).
 
 ### 5.9 Configuración general ✅ implementado
 
@@ -403,6 +411,11 @@ feature completa de Cotizaciones (`Quote`/`QuoteDayLine`), con
 recordatorio local y compartir por imagen. Mismo criterio que la revisión
 anterior: información real de un hostal real, no una hipótesis.
 
+Tercera **revisión post-v1** (2026-09-25, mismo día): a partir del mismo
+mecanismo de compartir por imagen, la administradora pidió el reporte de
+garaje que ya estaba anotado como idea futura (sección 9) — se construyó
+de una vez (sección 5.8), sin esperar a una sesión aparte.
+
 ## 9. Ideas futuras (fuera de alcance, no perder de vista)
 
 Cosas mencionadas que no se diseñan ni se construyen todavía, pero vale la
@@ -416,15 +429,11 @@ pena no olvidar:
   guardados. Un sistema que arme y envíe esa información (disponibilidad,
   videos) por WhatsApp sería una integración externa — fuera del alcance
   offline-first del MVP (ver sección 3).
-- **Exportar placas del día a Excel para el dueño del garaje:** hoy la
-  administradora arma a mano, todos los días, la lista de placas que van a
-  estar en el garaje esa noche y se la envía por WhatsApp al dueño del
-  parqueadero (que es un tercero, no el dueño de la propiedad). Un botón que
-  genere ese Excel a partir de los `Vehicle` de las reservas activas ese día
-  ahorraría el trabajo manual. No se construye ahora porque compartir por
-  WhatsApp es una integración externa — pero el modelo de datos (`Vehicle`
-  atado a `Reservation`) ya está preparado para esto: es una consulta, no un
-  cambio de esquema.
+- ~~**Exportar placas del día a Excel para el dueño del garaje**~~ — ✅
+  Construido (sección 5.8, revisión post-v1 2026-09-25), aunque no como
+  Excel: se implementó como imagen tipo tabla compartida por WhatsApp
+  (mismo mecanismo que Cotizaciones), a pedido explícito de la
+  administradora, que resultó más simple que generar un archivo.
 
 Estas ideas vienen de casos reales (hostales existentes, "Hospedaje
 Shejiná"), no son hipótesis — por eso se anotan acá en vez de descartarlas,

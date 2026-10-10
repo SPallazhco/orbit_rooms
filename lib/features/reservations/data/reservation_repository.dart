@@ -89,6 +89,10 @@ class ReservationRepository {
       final subtotalsCents = <String, int>{};
 
       for (final assignment in roomAssignments) {
+        final room = await (_db.select(
+          _db.rooms,
+        )..where((r) => r.id.equals(assignment.roomId))).getSingle();
+
         final available = await isRoomAvailable(
           roomId: assignment.roomId,
           checkInDate: checkInDate,
@@ -96,14 +100,10 @@ class ReservationRepository {
         );
         if (!available) {
           throw StateError(
-            'La habitación ${assignment.roomId} ya tiene una reserva activa '
+            'La habitación ${room.name} ya tiene una reserva activa '
             'en esas fechas',
           );
         }
-
-        final room = await (_db.select(
-          _db.rooms,
-        )..where((r) => r.id.equals(assignment.roomId))).getSingle();
 
         subtotalsCents[assignment.roomId] = calculateSubtotalCents(
           ratePerPersonWeekdayCents: room.ratePerPersonWeekdayCents,

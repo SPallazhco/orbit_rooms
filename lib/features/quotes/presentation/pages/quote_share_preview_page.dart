@@ -25,6 +25,7 @@ class QuoteSharePreviewPage extends StatefulWidget {
     required this.balanceCents,
     required this.currency,
     this.notes,
+    this.showBrand = false,
   });
 
   final String propertyName;
@@ -38,6 +39,10 @@ class QuoteSharePreviewPage extends StatefulWidget {
   final int balanceCents;
   final String currency;
   final String? notes;
+
+  /// Solo tiene sentido para la propiedad propia del usuario (ver
+  /// docs/DECISIONS.md) — muestra el logo del hostal en la imagen.
+  final bool showBrand;
 
   @override
   State<QuoteSharePreviewPage> createState() => _QuoteSharePreviewPageState();
@@ -88,6 +93,7 @@ class _QuoteSharePreviewPageState extends State<QuoteSharePreviewPage> {
             balanceCents: widget.balanceCents,
             currency: widget.currency,
             notes: widget.notes,
+            showBrand: widget.showBrand,
           ),
         ),
       ),

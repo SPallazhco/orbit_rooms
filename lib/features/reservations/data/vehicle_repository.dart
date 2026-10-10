@@ -11,9 +11,15 @@ class VehicleRepository {
     _db.vehicles,
   )..where((v) => v.reservationId.equals(reservationId))).get();
 
+  /// Reactivo, para el reporte de garaje (PRD 9): todos los vehículos de
+  /// todas las reservas, cruzado luego con la reserva activa ese día en el
+  /// provider derivado (`garageReportProvider`), no acá.
+  Stream<List<Vehicle>> watchAll() => _db.select(_db.vehicles).watch();
+
   Future<String> create({
     required String reservationId,
     required String plate,
+    int? garageFeeCents,
   }) async {
     final id = const Uuid().v4();
     await _db
@@ -23,10 +29,18 @@ class VehicleRepository {
             id: Value(id),
             reservationId: reservationId,
             plate: plate.trim().toUpperCase(),
+            garageFeeCents: Value(garageFeeCents),
           ),
         );
     return id;
   }
+
+  /// Comisión de garaje (PRD 9): "a conveniencia" de la administradora, sin
+  /// fórmula fija — se edita a mano después de registrar el auto.
+  Future<void> updateGarageFee(String id, int? garageFeeCents) =>
+      (_db.update(_db.vehicles)..where((v) => v.id.equals(id))).write(
+        VehiclesCompanion(garageFeeCents: Value(garageFeeCents)),
+      );
 
   Future<void> delete(String id) =>
       (_db.delete(_db.vehicles)..where((v) => v.id.equals(id))).go();

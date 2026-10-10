@@ -48,6 +48,11 @@ final paymentsProvider = StreamProvider<List<Payment>>(
   (ref) => ref.watch(paymentRepositoryProvider).watchAll(),
 );
 
+/// Para el reporte de garaje (PRD 9), en Reportes.
+final vehiclesProvider = StreamProvider<List<Vehicle>>(
+  (ref) => ref.watch(vehicleRepositoryProvider).watchAll(),
+);
+
 /// Historial de reservas de un huésped (PRD 5.3), en `GuestDetailPage`.
 final reservationsForGuestProvider =
     StreamProvider.family<List<Reservation>, String>(

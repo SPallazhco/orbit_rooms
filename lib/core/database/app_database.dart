@@ -50,7 +50,7 @@ class AppDatabase extends _$AppDatabase {
   factory AppDatabase.connect() => AppDatabase(_openConnection());
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -62,6 +62,9 @@ class AppDatabase extends _$AppDatabase {
           schema.appSettings,
           schema.appSettings.quoteReminderDays,
         );
+      },
+      from2To3: (m, schema) async {
+        await m.addColumn(schema.vehicles, schema.vehicles.garageFeeCents);
       },
     ),
     beforeOpen: (details) async {

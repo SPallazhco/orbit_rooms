@@ -1570,3 +1570,127 @@ recordatorio dispara con el contenido correcto (verificado 3 veces
 acortando temporalmente el lead time a 20s, revertido antes de terminar)
 → rechazar cancela el aviso, reactivar lo reprograma, sin errores en
 consola en ningún paso.
+
+---
+
+## 2026-09-25 — Reporte de garaje: la idea futura de la sección 9 del PRD, construida el mismo día
+
+**Contexto:** apenas cerrada la feature de Cotizaciones y validado el
+mecanismo de "compartir como imagen", la administradora pidió el reporte
+que ya estaba anotado en la sección 9 del PRD como idea futura: una lista
+de los autos registrados un día puntual, para enviársela al dueño del
+parqueadero (un tercero, no el dueño de la propiedad). Columnas pedidas
+explícitamente: nombre del huésped, número de celular, casa + habitación,
+placa del carro.
+
+**Decisión 1 — vive dentro de `features/reports/`, no una feature
+nueva:** es un reporte más (ocupación, ingresos, y ahora garaje), no un
+concepto de negocio distinto que justifique su propia carpeta
+`features/garage/`. Coherente con el criterio de "una feature por
+concepto real del negocio", no por cada pantalla.
+
+**Decisión 2 — imagen compartida, no Excel:** la sección 9 original
+proponía "exportar a Excel". Una vez que el mecanismo de imagen ya existía
+(de Cotizaciones) y la administradora vio que ya cubre exactamente este
+caso — una tabla que se envía por WhatsApp —, pedir Excel dejó de tener
+sentido: es más trabajo (generar el archivo, que alguien lo abra) para el
+mismo resultado. Se reusó `RepaintBoundary.toImage()` + `share_plus` tal
+cual, sin ninguna dependencia nueva.
+
+**Decisión 3 — `garageReportProvider` como provider derivado, sin tabla
+ni consulta SQL nueva:** mismo patrón que `reportDataProvider` y
+`dashboardDataProvider` — combina en Dart varios `StreamProvider`s que ya
+existían. La única pieza que faltaba era `vehiclesProvider`
+(`VehicleRepository.watchAll()`, nuevo): hasta ahora todo acceso a
+`Vehicle` era por reserva puntual (`getForReservation`), porque la única
+pantalla que los mostraba era el detalle de una reserva. Este es el
+primer caso que necesita verlos todos a la vez.
+
+**Decisión 4 — reusa la regla de "reserva activa ese día", no la
+redefine:** `status != ReservationStatus.cancelled` + fecha dentro de
+`[checkInDate, checkOutDate)`, idéntica (inline, sin extraerla a un
+helper — mismo criterio que Dashboard y Reports, que tampoco la
+extrajeron) a la que ya usan `dashboardDataProvider` y
+`reportDataProvider`. Un vehículo "aparece" el día del reporte si su
+reserva está activa ese día, sin importar su estado más allá de
+cancelada (pendiente o confirmada cuentan igual — el garaje no distingue
+eso).
+
+**Decisión 5 — una fila por vehículo, no por (vehículo, habitación):**
+`Vehicle` está atado a `Reservation`, no a una habitación puntual. Si una
+reserva cubre varias habitaciones, `roomNames` las junta todas en la
+misma celda ("Habitación 1, Habitación 2") en vez de repetir la fila del
+auto una vez por habitación — un auto es de la persona, no de un cuarto
+específico.
+
+**Estado:** vigente. Probado con
+`test/features/reports/reports_providers_test.dart` (una reserva activa
+el día del reporte aparece con sus 4 campos correctos; una reserva ya
+terminada antes de esa fecha no aparece) y a mano en simulador de punta a
+punta: crear una reserva activa hoy con un vehículo → el contador
+"Compartir con el parqueadero (1)" en `ReportsPage` lo refleja solo →
+abrir el reporte muestra la tabla con huésped/celular/casa+habitación/
+placa correctos → compartir genera una imagen PNG válida en la hoja de
+compartir nativa, sin errores en consola.
+
+---
+
+## 2026-09-29 — Rediseño visual de la imagen de cotización: marca solo para la propiedad propia
+
+**Contexto:** el usuario pidió explícitamente mejorar cómo se ve la
+imagen que `QuoteShareCard` genera para enviar al cliente — adjuntó un
+ejemplo real (el Excel que la administradora ya arma a mano, con logo y
+foto de portada) y el logo del hostal en alta resolución, pidiendo que
+se vea "limpio y homogéneo", no solo lleno de información.
+
+**Decisión 1 — el logo se muestra solo si la propiedad es la propia del
+usuario, no en todas las cotizaciones:** la app administra más de una
+propiedad (`Hospedaje Sara`, y potencialmente otras a futuro) — poner el
+logo de Hospedaje Shejiná en la cotización de una casa de un tercero
+sería directamente incorrecto, no un detalle menor. `showBrand` se
+calcula en `QuoteDetailPage` a partir de `Property.ownerName` (vacío =
+propia) al momento de compartir, y viaja como parámetro explícito hasta
+`QuoteShareCard` — mismo criterio ya usado para el campo de comisión de
+garaje (ver la entrada de "Reporte de comisión" más arriba): `ownerName`
+es la señal real de "esto no es mío" que el PRD reserva para eso,
+`isPrimary` es solo informativo y no lo garantiza. Esto obligó a agregar
+`ownerName` al `join` de `QuoteRepository.watchAll()`, que antes solo
+traía `propertyName`.
+
+**Decisión 2 — el logo es un asset estático del proyecto, no un campo de
+`Property`:** hoy solo Hospedaje Shejiná lo necesita (es, literalmente,
+el hostal real detrás de toda la app). Agregar una columna
+`logoPath`/`logoUrl` a `Property` para una sola propiedad que la usa
+sería una abstracción para un caso hipotético que no existe todavía —
+si en el futuro otra propiedad administrada también necesita su propio
+logo en las cotizaciones, ahí se generaliza. `assets/images/logo_shejina.webp`
+es el primer asset de imagen del proyecto (antes no había ninguno);
+declarado en `pubspec.yaml` bajo `flutter: assets:`.
+
+**Bug real encontrado y corregido en el camino:** al armar la tabla de
+desglose con columnas más angostas (para dejar espacio a la tarjeta con
+bordes redondeados y padding), los encabezados largos ("Personas",
+"TOTAL") se partían literalmente a la mitad de la palabra
+("Pers/onas", "TOT/AL") — Flutter fuerza el corte carácter por carácter
+cuando una sola palabra no entra en el ancho disponible, en vez de
+simplemente desbordar. La solución no fue agrandar las columnas sin
+límite (rompería el resto del layout): se acortaron las etiquetas
+("Fecha", "Valor", "Pers.", "Total") y las fechas por fila perdieron el
+año (ya se muestra una vez, arriba, como rango de la estadía completa con
+ícono de calendario) — menos texto por celda en vez de pelear con el
+ancho. De paso, se sacó la fila "TOTAL" de la tabla (ahí era donde peor
+se cortaba, en la columna más angosta) y se la reemplazó por una barra
+dorada aparte, más legible y con más jerarquía visual que una fila más
+de la grilla.
+
+**Estado:** vigente. `flutter analyze` y los 73 tests existentes en
+verde (el cambio de tipo en `QuoteRepository.watchAll()` — agregar
+`ownerName` al record — no rompió ningún test, solo agrega un campo).
+Probado a mano en simulador con dos casos reales: una cotización de
+"Hospedaje Shejina" (que en los datos actuales tiene `ownerName` cargado
+— ver el hallazgo de la sesión anterior sobre esa inconsistencia — por lo
+que hoy no muestra el logo, correctamente según la regla) y una
+cotización de una propiedad sin `ownerName` (sí muestra el logo),
+confirmando que `showBrand` responde a los datos reales y no a una
+propiedad hardcodeada. Compartir genera una imagen PNG válida en ambos
+casos, sin errores de layout en consola.

@@ -13,6 +13,12 @@ class Vehicles extends Table {
   TextColumn get reservationId => text().references(Reservations, #id)();
   TextColumn get plate => text()();
 
+  /// Cuánto se resta del ingreso de esa noche por tener este auto ahí, en
+  /// el reporte de comisión de una casa administrada (PRD 9) — decidido a
+  /// mano por la administradora ("a conveniencia", sin fórmula fija).
+  /// `null` = no hay descuento de garaje (mismo efecto que no tener auto).
+  IntColumn get garageFeeCents => integer().nullable()();
+
   @override
   Set<Column> get primaryKey => {id};
 }

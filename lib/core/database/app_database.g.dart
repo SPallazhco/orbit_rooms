@@ -3568,8 +3568,24 @@ class $VehiclesTable extends Vehicles with TableInfo<$VehiclesTable, Vehicle> {
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _garageFeeCentsMeta = const VerificationMeta(
+    'garageFeeCents',
+  );
   @override
-  List<GeneratedColumn> get $columns => [id, reservationId, plate];
+  late final GeneratedColumn<int> garageFeeCents = GeneratedColumn<int>(
+    'garage_fee_cents',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    reservationId,
+    plate,
+    garageFeeCents,
+  ];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -3604,6 +3620,15 @@ class $VehiclesTable extends Vehicles with TableInfo<$VehiclesTable, Vehicle> {
     } else if (isInserting) {
       context.missing(_plateMeta);
     }
+    if (data.containsKey('garage_fee_cents')) {
+      context.handle(
+        _garageFeeCentsMeta,
+        garageFeeCents.isAcceptableOrUnknown(
+          data['garage_fee_cents']!,
+          _garageFeeCentsMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -3625,6 +3650,10 @@ class $VehiclesTable extends Vehicles with TableInfo<$VehiclesTable, Vehicle> {
         DriftSqlType.string,
         data['${effectivePrefix}plate'],
       )!,
+      garageFeeCents: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}garage_fee_cents'],
+      ),
     );
   }
 
@@ -3638,10 +3667,17 @@ class Vehicle extends DataClass implements Insertable<Vehicle> {
   final String id;
   final String reservationId;
   final String plate;
+
+  /// Cuánto se resta del ingreso de esa noche por tener este auto ahí, en
+  /// el reporte de comisión de una casa administrada (PRD 9) — decidido a
+  /// mano por la administradora ("a conveniencia", sin fórmula fija).
+  /// `null` = no hay descuento de garaje (mismo efecto que no tener auto).
+  final int? garageFeeCents;
   const Vehicle({
     required this.id,
     required this.reservationId,
     required this.plate,
+    this.garageFeeCents,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -3649,6 +3685,9 @@ class Vehicle extends DataClass implements Insertable<Vehicle> {
     map['id'] = Variable<String>(id);
     map['reservation_id'] = Variable<String>(reservationId);
     map['plate'] = Variable<String>(plate);
+    if (!nullToAbsent || garageFeeCents != null) {
+      map['garage_fee_cents'] = Variable<int>(garageFeeCents);
+    }
     return map;
   }
 
@@ -3657,6 +3696,9 @@ class Vehicle extends DataClass implements Insertable<Vehicle> {
       id: Value(id),
       reservationId: Value(reservationId),
       plate: Value(plate),
+      garageFeeCents: garageFeeCents == null && nullToAbsent
+          ? const Value.absent()
+          : Value(garageFeeCents),
     );
   }
 
@@ -3669,6 +3711,7 @@ class Vehicle extends DataClass implements Insertable<Vehicle> {
       id: serializer.fromJson<String>(json['id']),
       reservationId: serializer.fromJson<String>(json['reservationId']),
       plate: serializer.fromJson<String>(json['plate']),
+      garageFeeCents: serializer.fromJson<int?>(json['garageFeeCents']),
     );
   }
   @override
@@ -3678,15 +3721,23 @@ class Vehicle extends DataClass implements Insertable<Vehicle> {
       'id': serializer.toJson<String>(id),
       'reservationId': serializer.toJson<String>(reservationId),
       'plate': serializer.toJson<String>(plate),
+      'garageFeeCents': serializer.toJson<int?>(garageFeeCents),
     };
   }
 
-  Vehicle copyWith({String? id, String? reservationId, String? plate}) =>
-      Vehicle(
-        id: id ?? this.id,
-        reservationId: reservationId ?? this.reservationId,
-        plate: plate ?? this.plate,
-      );
+  Vehicle copyWith({
+    String? id,
+    String? reservationId,
+    String? plate,
+    Value<int?> garageFeeCents = const Value.absent(),
+  }) => Vehicle(
+    id: id ?? this.id,
+    reservationId: reservationId ?? this.reservationId,
+    plate: plate ?? this.plate,
+    garageFeeCents: garageFeeCents.present
+        ? garageFeeCents.value
+        : this.garageFeeCents,
+  );
   Vehicle copyWithCompanion(VehiclesCompanion data) {
     return Vehicle(
       id: data.id.present ? data.id.value : this.id,
@@ -3694,6 +3745,9 @@ class Vehicle extends DataClass implements Insertable<Vehicle> {
           ? data.reservationId.value
           : this.reservationId,
       plate: data.plate.present ? data.plate.value : this.plate,
+      garageFeeCents: data.garageFeeCents.present
+          ? data.garageFeeCents.value
+          : this.garageFeeCents,
     );
   }
 
@@ -3702,37 +3756,42 @@ class Vehicle extends DataClass implements Insertable<Vehicle> {
     return (StringBuffer('Vehicle(')
           ..write('id: $id, ')
           ..write('reservationId: $reservationId, ')
-          ..write('plate: $plate')
+          ..write('plate: $plate, ')
+          ..write('garageFeeCents: $garageFeeCents')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, reservationId, plate);
+  int get hashCode => Object.hash(id, reservationId, plate, garageFeeCents);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is Vehicle &&
           other.id == this.id &&
           other.reservationId == this.reservationId &&
-          other.plate == this.plate);
+          other.plate == this.plate &&
+          other.garageFeeCents == this.garageFeeCents);
 }
 
 class VehiclesCompanion extends UpdateCompanion<Vehicle> {
   final Value<String> id;
   final Value<String> reservationId;
   final Value<String> plate;
+  final Value<int?> garageFeeCents;
   final Value<int> rowid;
   const VehiclesCompanion({
     this.id = const Value.absent(),
     this.reservationId = const Value.absent(),
     this.plate = const Value.absent(),
+    this.garageFeeCents = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   VehiclesCompanion.insert({
     this.id = const Value.absent(),
     required String reservationId,
     required String plate,
+    this.garageFeeCents = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : reservationId = Value(reservationId),
        plate = Value(plate);
@@ -3740,12 +3799,14 @@ class VehiclesCompanion extends UpdateCompanion<Vehicle> {
     Expression<String>? id,
     Expression<String>? reservationId,
     Expression<String>? plate,
+    Expression<int>? garageFeeCents,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
       if (reservationId != null) 'reservation_id': reservationId,
       if (plate != null) 'plate': plate,
+      if (garageFeeCents != null) 'garage_fee_cents': garageFeeCents,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -3754,12 +3815,14 @@ class VehiclesCompanion extends UpdateCompanion<Vehicle> {
     Value<String>? id,
     Value<String>? reservationId,
     Value<String>? plate,
+    Value<int?>? garageFeeCents,
     Value<int>? rowid,
   }) {
     return VehiclesCompanion(
       id: id ?? this.id,
       reservationId: reservationId ?? this.reservationId,
       plate: plate ?? this.plate,
+      garageFeeCents: garageFeeCents ?? this.garageFeeCents,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -3776,6 +3839,9 @@ class VehiclesCompanion extends UpdateCompanion<Vehicle> {
     if (plate.present) {
       map['plate'] = Variable<String>(plate.value);
     }
+    if (garageFeeCents.present) {
+      map['garage_fee_cents'] = Variable<int>(garageFeeCents.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -3788,6 +3854,7 @@ class VehiclesCompanion extends UpdateCompanion<Vehicle> {
           ..write('id: $id, ')
           ..write('reservationId: $reservationId, ')
           ..write('plate: $plate, ')
+          ..write('garageFeeCents: $garageFeeCents, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -8556,6 +8623,7 @@ typedef $$VehiclesTableCreateCompanionBuilder =
       Value<String> id,
       required String reservationId,
       required String plate,
+      Value<int?> garageFeeCents,
       Value<int> rowid,
     });
 typedef $$VehiclesTableUpdateCompanionBuilder =
@@ -8563,6 +8631,7 @@ typedef $$VehiclesTableUpdateCompanionBuilder =
       Value<String> id,
       Value<String> reservationId,
       Value<String> plate,
+      Value<int?> garageFeeCents,
       Value<int> rowid,
     });
 
@@ -8609,6 +8678,11 @@ class $$VehiclesTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<int> get garageFeeCents => $composableBuilder(
+    column: $table.garageFeeCents,
+    builder: (column) => ColumnFilters(column),
+  );
+
   $$ReservationsTableFilterComposer get reservationId {
     final $$ReservationsTableFilterComposer composer = $composerBuilder(
       composer: this,
@@ -8652,6 +8726,11 @@ class $$VehiclesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get garageFeeCents => $composableBuilder(
+    column: $table.garageFeeCents,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   $$ReservationsTableOrderingComposer get reservationId {
     final $$ReservationsTableOrderingComposer composer = $composerBuilder(
       composer: this,
@@ -8690,6 +8769,11 @@ class $$VehiclesTableAnnotationComposer
 
   GeneratedColumn<String> get plate =>
       $composableBuilder(column: $table.plate, builder: (column) => column);
+
+  GeneratedColumn<int> get garageFeeCents => $composableBuilder(
+    column: $table.garageFeeCents,
+    builder: (column) => column,
+  );
 
   $$ReservationsTableAnnotationComposer get reservationId {
     final $$ReservationsTableAnnotationComposer composer = $composerBuilder(
@@ -8746,11 +8830,13 @@ class $$VehiclesTableTableManager
                 Value<String> id = const Value.absent(),
                 Value<String> reservationId = const Value.absent(),
                 Value<String> plate = const Value.absent(),
+                Value<int?> garageFeeCents = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => VehiclesCompanion(
                 id: id,
                 reservationId: reservationId,
                 plate: plate,
+                garageFeeCents: garageFeeCents,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -8758,11 +8844,13 @@ class $$VehiclesTableTableManager
                 Value<String> id = const Value.absent(),
                 required String reservationId,
                 required String plate,
+                Value<int?> garageFeeCents = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => VehiclesCompanion.insert(
                 id: id,
                 reservationId: reservationId,
                 plate: plate,
+                garageFeeCents: garageFeeCents,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

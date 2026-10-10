@@ -39,7 +39,13 @@ class QuoteDetailPage extends ConsumerWidget {
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, _) => Center(child: Text('Error: $error')),
         data: (quotes) {
-          ({Quote quote, String propertyName, String roomName})? found;
+          ({
+            Quote quote,
+            String propertyName,
+            String? ownerName,
+            String roomName,
+          })?
+          found;
           for (final entry in quotes) {
             if (entry.quote.id == quoteId) {
               found = entry;
@@ -210,7 +216,8 @@ class QuoteDetailPage extends ConsumerWidget {
 
   void _shareQuote(
     BuildContext context,
-    ({Quote quote, String propertyName, String roomName}) entry,
+    ({Quote quote, String propertyName, String? ownerName, String roomName})
+    entry,
     Quote quote,
     List<QuoteDayLine> dayLines,
     int totalCents,
@@ -231,6 +238,7 @@ class QuoteDetailPage extends ConsumerWidget {
           balanceCents: balanceCents,
           currency: currency,
           notes: quote.notes,
+          showBrand: entry.ownerName == null || entry.ownerName!.trim().isEmpty,
         ),
       ),
     );

@@ -10,9 +10,11 @@ final quoteRepositoryProvider = Provider<QuoteRepository>(
 
 /// Estado reactivo, mismo patrón que `activePropertiesProvider`.
 final quotesProvider =
-    StreamProvider<List<({Quote quote, String propertyName, String roomName})>>(
-      (ref) => ref.watch(quoteRepositoryProvider).watchAll(),
-    );
+    StreamProvider<
+      List<
+        ({Quote quote, String propertyName, String? ownerName, String roomName})
+      >
+    >((ref) => ref.watch(quoteRepositoryProvider).watchAll());
 
 final quoteDayLinesProvider = StreamProvider.family<List<QuoteDayLine>, String>(
   (ref, quoteId) => ref.watch(quoteRepositoryProvider).watchDayLines(quoteId),
