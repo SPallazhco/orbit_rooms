@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:orbit_rooms/core/settings/settings_providers.dart';
+import 'package:orbit_rooms/features/quotes/domain/reminder_message.dart';
+import 'package:orbit_rooms/features/quotes/presentation/widgets/reminders_bell.dart';
+import 'package:orbit_rooms/features/settings/presentation/pages/edit_reminder_message_page.dart';
 import 'package:orbit_rooms/features/settings/presentation/widgets/add_holiday_dialog.dart';
 import 'package:orbit_rooms/features/settings/presentation/widgets/edit_currency_dialog.dart';
 import 'package:orbit_rooms/features/settings/presentation/widgets/edit_quote_reminder_days_dialog.dart';
@@ -17,9 +20,13 @@ class SettingsPage extends ConsumerWidget {
     final currencyAsync = ref.watch(currencyProvider);
     final holidaysAsync = ref.watch(holidaysProvider);
     final reminderDaysAsync = ref.watch(quoteReminderDaysProvider);
+    final templateAsync = ref.watch(reminderMessageTemplateProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Configuración')),
+      appBar: AppBar(
+        title: const Text('Configuración'),
+        actions: const [RemindersBell()],
+      ),
       drawer: const AppDrawer(),
       body: ListView(
         children: [
@@ -48,6 +55,20 @@ class SettingsPage extends ConsumerWidget {
               icon: const Icon(Icons.edit_outlined),
               onPressed: () =>
                   _editReminderDays(context, ref, reminderDaysAsync.value ?? 3),
+            ),
+          ),
+          ListTile(
+            title: const Text('Mensaje de recordatorio'),
+            subtitle: Text(
+              templateAsync.value ?? defaultReminderTemplate,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => const EditReminderMessagePage(),
+              ),
             ),
           ),
           const Divider(height: 32),

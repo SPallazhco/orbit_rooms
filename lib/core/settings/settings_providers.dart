@@ -27,3 +27,9 @@ final holidaysProvider = StreamProvider<List<Holiday>>(
 final quoteReminderDaysProvider = StreamProvider<int>(
   (ref) => ref.watch(appSettingsRepositoryProvider).watchQuoteReminderDays(),
 );
+
+/// `null` = la usuaria no lo personalizó (se usa el mensaje original).
+final reminderMessageTemplateProvider = StreamProvider<String?>(
+  (ref) =>
+      ref.watch(appSettingsRepositoryProvider).watchReminderMessageTemplate(),
+);

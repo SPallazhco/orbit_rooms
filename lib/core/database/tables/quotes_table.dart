@@ -24,7 +24,6 @@ class Quotes extends Table {
   DateTimeColumn get checkOutDate => dateTime()();
 
   IntColumn get adultsCount => integer()();
-  IntColumn get childrenCount => integer().withDefault(const Constant(0))();
 
   /// Sugerido como la mitad del total al crear la cotización, editable
   /// después — no hay una regla fija de anticipo.
@@ -41,6 +40,11 @@ class Quotes extends Table {
   /// Se completa al convertir la cotización en una reserva real.
   TextColumn get reservationId =>
       text().nullable().references(Reservations, #id)();
+
+  /// Cuándo se le envió el recordatorio ("recuerde que tiene una cotización
+  /// pendiente") — `null` = todavía no. Sirve para no insistir todos los
+  /// días desde la campana de avisos (ver docs/DECISIONS.md).
+  DateTimeColumn get reminderSentAt => dateTime().nullable()();
 
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
 

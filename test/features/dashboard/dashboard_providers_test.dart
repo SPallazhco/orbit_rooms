@@ -9,7 +9,7 @@ import 'package:orbit_rooms/features/reservations/data/reservation_repository.da
 import 'package:orbit_rooms/features/reservations/reservations_providers.dart';
 import 'package:uuid/uuid.dart';
 
-/// `dashboardDataProvider` combina 4 `StreamProvider`s: cada uno necesita su
+/// `dashboardDataProvider` combina 5 `StreamProvider`s: cada uno necesita su
 /// propia vuelta del event loop para emitir su primer valor tras un cambio.
 Future<void> _pump() async {
   for (var i = 0; i < 5; i++) {
@@ -119,5 +119,24 @@ void main() {
     expect(data.todayCheckOuts, hasLength(1));
     expect(data.incomeTodayCents, 3000);
     expect(data.incomeMonthCents, 3000);
+
+    expect(data.guestsInHouseCount, 2);
+    expect(data.occupancyByProperty, [
+      (propertyName: 'Hostal', occupied: 1, total: 2),
+    ]);
+
+    final checkIn = data.todayCheckIns.single;
+    expect(checkIn.guestName, 'Ana Pérez');
+    expect(checkIn.roomNames, 'Cuarto $roomAId');
+    expect(checkIn.guestsCount, 2);
+    expect(checkIn.balanceCents, checkIn.reservation.totalPriceCents - 3000);
+
+    final checkOut = data.todayCheckOuts.single;
+    expect(checkOut.roomNames, 'Cuarto $roomBId');
+    expect(checkOut.balanceCents, checkOut.reservation.totalPriceCents);
+
+    expect(data.tomorrowCheckInsCount, 0);
+    expect(data.tomorrowCheckOutsCount, 0);
+    expect(data.pendingQuotesCount, 0);
   });
 }

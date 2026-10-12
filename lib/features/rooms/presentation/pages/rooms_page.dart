@@ -1,3 +1,4 @@
+import 'package:orbit_rooms/features/quotes/presentation/widgets/reminders_bell.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:orbit_rooms/core/database/app_database.dart';
@@ -13,7 +14,10 @@ class RoomsPage extends ConsumerWidget {
     final roomsAsync = ref.watch(activeRoomsProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Habitaciones')),
+      appBar: AppBar(
+        title: const Text('Habitaciones'),
+        actions: const [RemindersBell()],
+      ),
       body: roomsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, _) => Center(child: Text('Error: $error')),

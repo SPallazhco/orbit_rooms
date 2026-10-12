@@ -80,7 +80,7 @@ futura, y modelo de `Property` ya preparado para más de una).
 | **Payment** (Pago) | Registro de pago asociado a una `Reservation` completa (el grupo), no a una habitación individual: monto, método, estado. Una reserva puede tener uno o más pagos (pago parcial). |
 | **Vehicle** (Vehículo) | Placa de un auto declarado para una `Reservation` (el garaje incluido es una fortaleza real del negocio). Un huésped puede declarar más de un vehículo. Atado a la reserva, y por lo tanto al huésped vía `Reservation.guestId`. |
 | **Quote** (Cotización) | El flujo previo a la reserva: un posible huésped contacta (a veces sin dar ni el nombre) y la administradora arma un presupuesto día por día antes de que exista un `Guest` real. Vive con estado propio (`pending`/`reserved`/`rejected`) y, si acepta, se convierte en una `Reservation` real. Entidad separada de `Reservation`, no una reutilización (ver sección 5.3bis). |
-| **QuoteDayLine** (Línea de cotización) | Una fila por noche dentro de una `Quote`: tarifa de adulto y de niño para esa fecha puntual, ambas editables a mano (la tarifa de niño no tiene default automático, se decide caso a caso). |
+| **QuoteDayLine** (Línea de cotización) | Una fila por noche dentro de una `Quote`: tarifa de adulto para esa fecha puntual, editable a mano. Las tarifas de niños viven aparte, por grupo y noche (`QuoteChildGroup`/`QuoteChildRate`). |
 
 Relaciones:
 
@@ -166,11 +166,44 @@ por eso `Quote` es una entidad separada.
   veces no hay ni el nombre).
 - El sistema arma una `QuoteDayLine` por noche con la tarifa de adulto
   precargada según la regla ya existente (entre semana/fin de
-  semana/feriado). La tarifa de niño **no tiene default automático**
-  (arranca en 0): es una decisión caso a caso de la administradora, que
-  puede variar día a día dentro de la misma cotización (ej. cobrar $10 el
-  primer día y $7 el último). **Ambas tarifas —adulto y niño— son
-  editables a mano por noche**, no solo al crear.
+  semana/feriado). La tarifa de niño **no tiene default automático**:
+  es una decisión caso a caso de la administradora, que puede variar día
+  a día dentro de la misma cotización (ej. cobrar $10 el primer día y $7
+  el último) y **no es la misma para todos los niños** (ej. 3 niños de 8
+  años a $7 y uno de 2 años a $5, revisión 2026-10-10). Por eso los niños
+  se cargan como **grupos** (cantidad + tarifa por noche, uno por cada
+  tarifa distinta); cada grupo arranca con la misma tarifa en todas las
+  noches y se ajusta noche por noche (feriado, fin de semana). **Las
+  tarifas —adulto y de cada grupo de niños— son editables a mano por
+  noche**, no solo al crear. Un grupo con tarifa 0 (casi siempre una
+  tarifa que falta cargar) muestra una advertencia en el detalle.
+- **Lista de cotizaciones** (revisión 2026-10-10): cada cotización se
+  muestra con el título `Nombre - fecha de check-in - N adultos, M niños`
+  (el nombre es opcional: sin nombre arranca por la fecha, así cada una
+  se distingue igual), casa y habitación, rango de fechas con noches,
+  total, estado y —si está pendiente— cuánto falta para el check-in
+  (resaltado cuando faltan 3 días o menos). Filtros por estado con
+  contador (por defecto **Pendientes**, lo que hay que atender), búsqueda
+  por nombre/contacto/habitación, las próximas primero (la más cercana
+  arriba) y las de fechas pasadas separadas al final. Ver
+  [DECISIONS.md](DECISIONS.md).
+- **Campana de avisos** (revisión 2026-10-10): en la esquina superior
+  derecha de las pantallas principales hay una campana con un número. Al
+  tocarla se ve quién cotizó y todavía no confirmó cuando su check-in está
+  a `quoteReminderDays` días o menos (mismo valor de Configuración que ya
+  usa la notificación del teléfono; incluye el mismo día del check-in). Se
+  calcula sola: desaparece al reservar, rechazar o pasar el día del
+  check-in. Al tocar una fila se abre **"Recordar al cliente"**: el mensaje
+  ya armado y editable, el número del cliente con botón "Copiar" y el botón
+  "Enviar por WhatsApp", que abre la hoja de compartir (igual que las
+  imágenes del parqueadero y la comisión: **no hay API de WhatsApp ni envío
+  automático**, la usuaria elige el chat y pulsa enviar). Al enviarlo, la
+  cotización queda como "Recordada" (baja a una sección aparte y deja de
+  contar en el número) y se cancela la notificación del teléfono pendiente;
+  también se puede marcar manualmente ("Ya le escribí por otro medio"). El
+  texto del mensaje lo personaliza la usuaria en Configuración con
+  variables (`{nombre}`, `{casa}`, `{fecha}`, `{personas}`, `{total}`,
+  `{abono}`), con vista previa y botón para restaurar el original.
 - Depósito sugerido: mitad del total calculado, editable a mano.
 - **Estado de la cotización:** `pending` (recién creada) → `reserved`
   (se convirtió en una reserva real) o `rejected` (el huésped no
@@ -226,6 +259,15 @@ repartido en 2-3 habitaciones según capacidad disponible).
   automática, ver [DECISIONS.md](DECISIONS.md)). El motivo del ajuste se
   deja anotado en `notes`, no en un campo estructurado.
 - Ver y actualizar el estado de pago de la reserva completa.
+- **Lista de reservas** (revisión 2026-10-10): cada reserva es una tarjeta
+  con huésped, habitaciones y personas, fechas con noches, total, un aviso
+  de cuándo pasa lo siguiente ("Llega mañana", "Sale hoy"…) y el estado de
+  cobro ("Pagada" / "Saldo X" / "Sin abono"). Se agrupan por momento, no
+  por orden de creación: **En casa** (la que sale antes arriba, una que
+  sale hoy sigue en casa hasta marcar el check-out), **Próximas** (la más
+  cercana arriba), **Pasadas** y **Canceladas**. Filtros con contador
+  (por defecto **Activas** = en casa + próximas) y búsqueda por huésped o
+  habitación. Ver [DECISIONS.md](DECISIONS.md).
 - **Vehículos (garaje):** una reserva puede tener cero o más `Vehicle`
   (placa). El garaje incluido es una de las fortalezas reales del negocio;
   cada placa debe quedar atada a la reserva (y por lo tanto al huésped) para
@@ -277,19 +319,18 @@ repartido en 2-3 habitaciones según capacidad disponible).
   habitación (ver [DECISIONS.md](DECISIONS.md)). El check-in/check-out del
   día es tappable y navega al detalle de esa reserva, igual que en la
   pantalla de Reservas.
+- Rediseño (2026-10-09): saludo + fecha, dona animada de ocupación con
+  huéspedes hospedados y barras por propiedad (solo si hay más de una),
+  llegadas/salidas con habitaciones, personas y saldo pendiente por
+  reserva, conteo de llegadas/salidas de mañana, ingresos de hoy/mes en
+  tarjetas y acceso directo a cotizaciones pendientes.
 
 ### 5.8 Reports ✅ implementado
 
-- Reporte de ocupación por rango de fechas: noches-habitación ocupadas vs.
-  disponibles (todas las habitaciones activas de todas las propiedades × la
-  cantidad de días del rango) y el porcentaje resultante.
-- Reporte de ingresos (pagos registrados) por rango de fechas: suma de
-  `Payment.amountCents` con `paidAt` dentro del rango.
-- Es global (todas las propiedades juntas), no filtrado por propiedad — a
-  diferencia del Calendar (5.6), acá el PRD no pedía ese filtro y un
-  resumen de negocio completo es lo que tiene sentido para "reportes".
-  Selector de rango de fechas con el `showDateRangePicker` nativo de
-  Flutter; por defecto, el mes en curso (día 1 hasta hoy). Ver
+- ~~Reporte de ocupación e ingresos por rango de fechas~~ — retirado
+  (2026-10-09): el Dashboard (5.7) ya muestra la ocupación actual y los
+  ingresos de hoy/mes, y la pantalla de Reportes quedó dedicada a los dos
+  reportes que se comparten con terceros (garaje y comisión). Ver
   [DECISIONS.md](DECISIONS.md).
 - **Reporte de garaje** (idea futura de la sección 9, convertida en
   feature a pedido de la administradora): lista de vehículos con reserva

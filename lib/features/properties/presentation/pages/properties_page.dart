@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:orbit_rooms/core/database/app_database.dart';
 import 'package:orbit_rooms/features/properties/presentation/widgets/add_property_dialog.dart';
 import 'package:orbit_rooms/features/properties/properties_providers.dart';
+import 'package:orbit_rooms/features/quotes/presentation/widgets/reminders_bell.dart';
 import 'package:orbit_rooms/shared/widgets/app_drawer.dart';
 
 class PropertiesPage extends ConsumerWidget {
@@ -14,7 +15,10 @@ class PropertiesPage extends ConsumerWidget {
     final propertiesAsync = ref.watch(activePropertiesProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text("OrbitRooms")),
+      appBar: AppBar(
+        title: const Text("OrbitRooms"),
+        actions: const [RemindersBell()],
+      ),
       drawer: AppDrawer(),
       body: propertiesAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),

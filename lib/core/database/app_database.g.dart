@@ -3050,8 +3050,24 @@ class $AppSettingsTable extends AppSettings
     requiredDuringInsert: false,
     defaultValue: const Constant(3),
   );
+  static const VerificationMeta _reminderMessageTemplateMeta =
+      const VerificationMeta('reminderMessageTemplate');
   @override
-  List<GeneratedColumn> get $columns => [id, currency, quoteReminderDays];
+  late final GeneratedColumn<String> reminderMessageTemplate =
+      GeneratedColumn<String>(
+        'reminder_message_template',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    currency,
+    quoteReminderDays,
+    reminderMessageTemplate,
+  ];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -3082,6 +3098,15 @@ class $AppSettingsTable extends AppSettings
         ),
       );
     }
+    if (data.containsKey('reminder_message_template')) {
+      context.handle(
+        _reminderMessageTemplateMeta,
+        reminderMessageTemplate.isAcceptableOrUnknown(
+          data['reminder_message_template']!,
+          _reminderMessageTemplateMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -3103,6 +3128,10 @@ class $AppSettingsTable extends AppSettings
         DriftSqlType.int,
         data['${effectivePrefix}quote_reminder_days'],
       )!,
+      reminderMessageTemplate: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}reminder_message_template'],
+      ),
     );
   }
 
@@ -3119,10 +3148,15 @@ class AppSetting extends DataClass implements Insertable<AppSetting> {
   /// Días de anticipación para el recordatorio de "recontactar" una
   /// cotización pendiente (PRD 5.4 extendido — ver docs/DECISIONS.md).
   final int quoteReminderDays;
+
+  /// Texto del mensaje de recordatorio con variables (`{nombre}`, `{casa}`,
+  /// ...). `null` = se usa el mensaje original de la app.
+  final String? reminderMessageTemplate;
   const AppSetting({
     required this.id,
     required this.currency,
     required this.quoteReminderDays,
+    this.reminderMessageTemplate,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -3130,6 +3164,11 @@ class AppSetting extends DataClass implements Insertable<AppSetting> {
     map['id'] = Variable<String>(id);
     map['currency'] = Variable<String>(currency);
     map['quote_reminder_days'] = Variable<int>(quoteReminderDays);
+    if (!nullToAbsent || reminderMessageTemplate != null) {
+      map['reminder_message_template'] = Variable<String>(
+        reminderMessageTemplate,
+      );
+    }
     return map;
   }
 
@@ -3138,6 +3177,9 @@ class AppSetting extends DataClass implements Insertable<AppSetting> {
       id: Value(id),
       currency: Value(currency),
       quoteReminderDays: Value(quoteReminderDays),
+      reminderMessageTemplate: reminderMessageTemplate == null && nullToAbsent
+          ? const Value.absent()
+          : Value(reminderMessageTemplate),
     );
   }
 
@@ -3150,6 +3192,9 @@ class AppSetting extends DataClass implements Insertable<AppSetting> {
       id: serializer.fromJson<String>(json['id']),
       currency: serializer.fromJson<String>(json['currency']),
       quoteReminderDays: serializer.fromJson<int>(json['quoteReminderDays']),
+      reminderMessageTemplate: serializer.fromJson<String?>(
+        json['reminderMessageTemplate'],
+      ),
     );
   }
   @override
@@ -3159,15 +3204,25 @@ class AppSetting extends DataClass implements Insertable<AppSetting> {
       'id': serializer.toJson<String>(id),
       'currency': serializer.toJson<String>(currency),
       'quoteReminderDays': serializer.toJson<int>(quoteReminderDays),
+      'reminderMessageTemplate': serializer.toJson<String?>(
+        reminderMessageTemplate,
+      ),
     };
   }
 
-  AppSetting copyWith({String? id, String? currency, int? quoteReminderDays}) =>
-      AppSetting(
-        id: id ?? this.id,
-        currency: currency ?? this.currency,
-        quoteReminderDays: quoteReminderDays ?? this.quoteReminderDays,
-      );
+  AppSetting copyWith({
+    String? id,
+    String? currency,
+    int? quoteReminderDays,
+    Value<String?> reminderMessageTemplate = const Value.absent(),
+  }) => AppSetting(
+    id: id ?? this.id,
+    currency: currency ?? this.currency,
+    quoteReminderDays: quoteReminderDays ?? this.quoteReminderDays,
+    reminderMessageTemplate: reminderMessageTemplate.present
+        ? reminderMessageTemplate.value
+        : this.reminderMessageTemplate,
+  );
   AppSetting copyWithCompanion(AppSettingsCompanion data) {
     return AppSetting(
       id: data.id.present ? data.id.value : this.id,
@@ -3175,6 +3230,9 @@ class AppSetting extends DataClass implements Insertable<AppSetting> {
       quoteReminderDays: data.quoteReminderDays.present
           ? data.quoteReminderDays.value
           : this.quoteReminderDays,
+      reminderMessageTemplate: data.reminderMessageTemplate.present
+          ? data.reminderMessageTemplate.value
+          : this.reminderMessageTemplate,
     );
   }
 
@@ -3183,49 +3241,58 @@ class AppSetting extends DataClass implements Insertable<AppSetting> {
     return (StringBuffer('AppSetting(')
           ..write('id: $id, ')
           ..write('currency: $currency, ')
-          ..write('quoteReminderDays: $quoteReminderDays')
+          ..write('quoteReminderDays: $quoteReminderDays, ')
+          ..write('reminderMessageTemplate: $reminderMessageTemplate')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, currency, quoteReminderDays);
+  int get hashCode =>
+      Object.hash(id, currency, quoteReminderDays, reminderMessageTemplate);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is AppSetting &&
           other.id == this.id &&
           other.currency == this.currency &&
-          other.quoteReminderDays == this.quoteReminderDays);
+          other.quoteReminderDays == this.quoteReminderDays &&
+          other.reminderMessageTemplate == this.reminderMessageTemplate);
 }
 
 class AppSettingsCompanion extends UpdateCompanion<AppSetting> {
   final Value<String> id;
   final Value<String> currency;
   final Value<int> quoteReminderDays;
+  final Value<String?> reminderMessageTemplate;
   final Value<int> rowid;
   const AppSettingsCompanion({
     this.id = const Value.absent(),
     this.currency = const Value.absent(),
     this.quoteReminderDays = const Value.absent(),
+    this.reminderMessageTemplate = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   AppSettingsCompanion.insert({
     this.id = const Value.absent(),
     this.currency = const Value.absent(),
     this.quoteReminderDays = const Value.absent(),
+    this.reminderMessageTemplate = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   static Insertable<AppSetting> custom({
     Expression<String>? id,
     Expression<String>? currency,
     Expression<int>? quoteReminderDays,
+    Expression<String>? reminderMessageTemplate,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
       if (currency != null) 'currency': currency,
       if (quoteReminderDays != null) 'quote_reminder_days': quoteReminderDays,
+      if (reminderMessageTemplate != null)
+        'reminder_message_template': reminderMessageTemplate,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -3234,12 +3301,15 @@ class AppSettingsCompanion extends UpdateCompanion<AppSetting> {
     Value<String>? id,
     Value<String>? currency,
     Value<int>? quoteReminderDays,
+    Value<String?>? reminderMessageTemplate,
     Value<int>? rowid,
   }) {
     return AppSettingsCompanion(
       id: id ?? this.id,
       currency: currency ?? this.currency,
       quoteReminderDays: quoteReminderDays ?? this.quoteReminderDays,
+      reminderMessageTemplate:
+          reminderMessageTemplate ?? this.reminderMessageTemplate,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -3256,6 +3326,11 @@ class AppSettingsCompanion extends UpdateCompanion<AppSetting> {
     if (quoteReminderDays.present) {
       map['quote_reminder_days'] = Variable<int>(quoteReminderDays.value);
     }
+    if (reminderMessageTemplate.present) {
+      map['reminder_message_template'] = Variable<String>(
+        reminderMessageTemplate.value,
+      );
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -3268,6 +3343,7 @@ class AppSettingsCompanion extends UpdateCompanion<AppSetting> {
           ..write('id: $id, ')
           ..write('currency: $currency, ')
           ..write('quoteReminderDays: $quoteReminderDays, ')
+          ..write('reminderMessageTemplate: $reminderMessageTemplate, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -3957,18 +4033,6 @@ class $QuotesTable extends Quotes with TableInfo<$QuotesTable, Quote> {
     type: DriftSqlType.int,
     requiredDuringInsert: true,
   );
-  static const VerificationMeta _childrenCountMeta = const VerificationMeta(
-    'childrenCount',
-  );
-  @override
-  late final GeneratedColumn<int> childrenCount = GeneratedColumn<int>(
-    'children_count',
-    aliasedName,
-    false,
-    type: DriftSqlType.int,
-    requiredDuringInsert: false,
-    defaultValue: const Constant(0),
-  );
   static const VerificationMeta _depositCentsMeta = const VerificationMeta(
     'depositCents',
   );
@@ -4013,6 +4077,18 @@ class $QuotesTable extends Quotes with TableInfo<$QuotesTable, Quote> {
       'REFERENCES reservations (id)',
     ),
   );
+  static const VerificationMeta _reminderSentAtMeta = const VerificationMeta(
+    'reminderSentAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> reminderSentAt =
+      GeneratedColumn<DateTime>(
+        'reminder_sent_at',
+        aliasedName,
+        true,
+        type: DriftSqlType.dateTime,
+        requiredDuringInsert: false,
+      );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -4035,11 +4111,11 @@ class $QuotesTable extends Quotes with TableInfo<$QuotesTable, Quote> {
     checkInDate,
     checkOutDate,
     adultsCount,
-    childrenCount,
     depositCents,
     notes,
     status,
     reservationId,
+    reminderSentAt,
     createdAt,
   ];
   @override
@@ -4121,15 +4197,6 @@ class $QuotesTable extends Quotes with TableInfo<$QuotesTable, Quote> {
     } else if (isInserting) {
       context.missing(_adultsCountMeta);
     }
-    if (data.containsKey('children_count')) {
-      context.handle(
-        _childrenCountMeta,
-        childrenCount.isAcceptableOrUnknown(
-          data['children_count']!,
-          _childrenCountMeta,
-        ),
-      );
-    }
     if (data.containsKey('deposit_cents')) {
       context.handle(
         _depositCentsMeta,
@@ -4153,6 +4220,15 @@ class $QuotesTable extends Quotes with TableInfo<$QuotesTable, Quote> {
         reservationId.isAcceptableOrUnknown(
           data['reservation_id']!,
           _reservationIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('reminder_sent_at')) {
+      context.handle(
+        _reminderSentAtMeta,
+        reminderSentAt.isAcceptableOrUnknown(
+          data['reminder_sent_at']!,
+          _reminderSentAtMeta,
         ),
       );
     }
@@ -4203,10 +4279,6 @@ class $QuotesTable extends Quotes with TableInfo<$QuotesTable, Quote> {
         DriftSqlType.int,
         data['${effectivePrefix}adults_count'],
       )!,
-      childrenCount: attachedDatabase.typeMapping.read(
-        DriftSqlType.int,
-        data['${effectivePrefix}children_count'],
-      )!,
       depositCents: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}deposit_cents'],
@@ -4224,6 +4296,10 @@ class $QuotesTable extends Quotes with TableInfo<$QuotesTable, Quote> {
       reservationId: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}reservation_id'],
+      ),
+      reminderSentAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}reminder_sent_at'],
       ),
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
@@ -4253,7 +4329,6 @@ class Quote extends DataClass implements Insertable<Quote> {
   final DateTime checkInDate;
   final DateTime checkOutDate;
   final int adultsCount;
-  final int childrenCount;
 
   /// Sugerido como la mitad del total al crear la cotización, editable
   /// después — no hay una regla fija de anticipo.
@@ -4267,6 +4342,11 @@ class Quote extends DataClass implements Insertable<Quote> {
 
   /// Se completa al convertir la cotización en una reserva real.
   final String? reservationId;
+
+  /// Cuándo se le envió el recordatorio ("recuerde que tiene una cotización
+  /// pendiente") — `null` = todavía no. Sirve para no insistir todos los
+  /// días desde la campana de avisos (ver docs/DECISIONS.md).
+  final DateTime? reminderSentAt;
   final DateTime createdAt;
   const Quote({
     required this.id,
@@ -4277,11 +4357,11 @@ class Quote extends DataClass implements Insertable<Quote> {
     required this.checkInDate,
     required this.checkOutDate,
     required this.adultsCount,
-    required this.childrenCount,
     required this.depositCents,
     this.notes,
     required this.status,
     this.reservationId,
+    this.reminderSentAt,
     required this.createdAt,
   });
   @override
@@ -4299,7 +4379,6 @@ class Quote extends DataClass implements Insertable<Quote> {
     map['check_in_date'] = Variable<DateTime>(checkInDate);
     map['check_out_date'] = Variable<DateTime>(checkOutDate);
     map['adults_count'] = Variable<int>(adultsCount);
-    map['children_count'] = Variable<int>(childrenCount);
     map['deposit_cents'] = Variable<int>(depositCents);
     if (!nullToAbsent || notes != null) {
       map['notes'] = Variable<String>(notes);
@@ -4311,6 +4390,9 @@ class Quote extends DataClass implements Insertable<Quote> {
     }
     if (!nullToAbsent || reservationId != null) {
       map['reservation_id'] = Variable<String>(reservationId);
+    }
+    if (!nullToAbsent || reminderSentAt != null) {
+      map['reminder_sent_at'] = Variable<DateTime>(reminderSentAt);
     }
     map['created_at'] = Variable<DateTime>(createdAt);
     return map;
@@ -4330,7 +4412,6 @@ class Quote extends DataClass implements Insertable<Quote> {
       checkInDate: Value(checkInDate),
       checkOutDate: Value(checkOutDate),
       adultsCount: Value(adultsCount),
-      childrenCount: Value(childrenCount),
       depositCents: Value(depositCents),
       notes: notes == null && nullToAbsent
           ? const Value.absent()
@@ -4339,6 +4420,9 @@ class Quote extends DataClass implements Insertable<Quote> {
       reservationId: reservationId == null && nullToAbsent
           ? const Value.absent()
           : Value(reservationId),
+      reminderSentAt: reminderSentAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(reminderSentAt),
       createdAt: Value(createdAt),
     );
   }
@@ -4357,13 +4441,13 @@ class Quote extends DataClass implements Insertable<Quote> {
       checkInDate: serializer.fromJson<DateTime>(json['checkInDate']),
       checkOutDate: serializer.fromJson<DateTime>(json['checkOutDate']),
       adultsCount: serializer.fromJson<int>(json['adultsCount']),
-      childrenCount: serializer.fromJson<int>(json['childrenCount']),
       depositCents: serializer.fromJson<int>(json['depositCents']),
       notes: serializer.fromJson<String?>(json['notes']),
       status: $QuotesTable.$converterstatus.fromJson(
         serializer.fromJson<String>(json['status']),
       ),
       reservationId: serializer.fromJson<String?>(json['reservationId']),
+      reminderSentAt: serializer.fromJson<DateTime?>(json['reminderSentAt']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
     );
   }
@@ -4379,13 +4463,13 @@ class Quote extends DataClass implements Insertable<Quote> {
       'checkInDate': serializer.toJson<DateTime>(checkInDate),
       'checkOutDate': serializer.toJson<DateTime>(checkOutDate),
       'adultsCount': serializer.toJson<int>(adultsCount),
-      'childrenCount': serializer.toJson<int>(childrenCount),
       'depositCents': serializer.toJson<int>(depositCents),
       'notes': serializer.toJson<String?>(notes),
       'status': serializer.toJson<String>(
         $QuotesTable.$converterstatus.toJson(status),
       ),
       'reservationId': serializer.toJson<String?>(reservationId),
+      'reminderSentAt': serializer.toJson<DateTime?>(reminderSentAt),
       'createdAt': serializer.toJson<DateTime>(createdAt),
     };
   }
@@ -4399,11 +4483,11 @@ class Quote extends DataClass implements Insertable<Quote> {
     DateTime? checkInDate,
     DateTime? checkOutDate,
     int? adultsCount,
-    int? childrenCount,
     int? depositCents,
     Value<String?> notes = const Value.absent(),
     QuoteStatus? status,
     Value<String?> reservationId = const Value.absent(),
+    Value<DateTime?> reminderSentAt = const Value.absent(),
     DateTime? createdAt,
   }) => Quote(
     id: id ?? this.id,
@@ -4414,13 +4498,15 @@ class Quote extends DataClass implements Insertable<Quote> {
     checkInDate: checkInDate ?? this.checkInDate,
     checkOutDate: checkOutDate ?? this.checkOutDate,
     adultsCount: adultsCount ?? this.adultsCount,
-    childrenCount: childrenCount ?? this.childrenCount,
     depositCents: depositCents ?? this.depositCents,
     notes: notes.present ? notes.value : this.notes,
     status: status ?? this.status,
     reservationId: reservationId.present
         ? reservationId.value
         : this.reservationId,
+    reminderSentAt: reminderSentAt.present
+        ? reminderSentAt.value
+        : this.reminderSentAt,
     createdAt: createdAt ?? this.createdAt,
   );
   Quote copyWithCompanion(QuotesCompanion data) {
@@ -4443,9 +4529,6 @@ class Quote extends DataClass implements Insertable<Quote> {
       adultsCount: data.adultsCount.present
           ? data.adultsCount.value
           : this.adultsCount,
-      childrenCount: data.childrenCount.present
-          ? data.childrenCount.value
-          : this.childrenCount,
       depositCents: data.depositCents.present
           ? data.depositCents.value
           : this.depositCents,
@@ -4454,6 +4537,9 @@ class Quote extends DataClass implements Insertable<Quote> {
       reservationId: data.reservationId.present
           ? data.reservationId.value
           : this.reservationId,
+      reminderSentAt: data.reminderSentAt.present
+          ? data.reminderSentAt.value
+          : this.reminderSentAt,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
     );
   }
@@ -4469,11 +4555,11 @@ class Quote extends DataClass implements Insertable<Quote> {
           ..write('checkInDate: $checkInDate, ')
           ..write('checkOutDate: $checkOutDate, ')
           ..write('adultsCount: $adultsCount, ')
-          ..write('childrenCount: $childrenCount, ')
           ..write('depositCents: $depositCents, ')
           ..write('notes: $notes, ')
           ..write('status: $status, ')
           ..write('reservationId: $reservationId, ')
+          ..write('reminderSentAt: $reminderSentAt, ')
           ..write('createdAt: $createdAt')
           ..write(')'))
         .toString();
@@ -4489,11 +4575,11 @@ class Quote extends DataClass implements Insertable<Quote> {
     checkInDate,
     checkOutDate,
     adultsCount,
-    childrenCount,
     depositCents,
     notes,
     status,
     reservationId,
+    reminderSentAt,
     createdAt,
   );
   @override
@@ -4508,11 +4594,11 @@ class Quote extends DataClass implements Insertable<Quote> {
           other.checkInDate == this.checkInDate &&
           other.checkOutDate == this.checkOutDate &&
           other.adultsCount == this.adultsCount &&
-          other.childrenCount == this.childrenCount &&
           other.depositCents == this.depositCents &&
           other.notes == this.notes &&
           other.status == this.status &&
           other.reservationId == this.reservationId &&
+          other.reminderSentAt == this.reminderSentAt &&
           other.createdAt == this.createdAt);
 }
 
@@ -4525,11 +4611,11 @@ class QuotesCompanion extends UpdateCompanion<Quote> {
   final Value<DateTime> checkInDate;
   final Value<DateTime> checkOutDate;
   final Value<int> adultsCount;
-  final Value<int> childrenCount;
   final Value<int> depositCents;
   final Value<String?> notes;
   final Value<QuoteStatus> status;
   final Value<String?> reservationId;
+  final Value<DateTime?> reminderSentAt;
   final Value<DateTime> createdAt;
   final Value<int> rowid;
   const QuotesCompanion({
@@ -4541,11 +4627,11 @@ class QuotesCompanion extends UpdateCompanion<Quote> {
     this.checkInDate = const Value.absent(),
     this.checkOutDate = const Value.absent(),
     this.adultsCount = const Value.absent(),
-    this.childrenCount = const Value.absent(),
     this.depositCents = const Value.absent(),
     this.notes = const Value.absent(),
     this.status = const Value.absent(),
     this.reservationId = const Value.absent(),
+    this.reminderSentAt = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -4558,11 +4644,11 @@ class QuotesCompanion extends UpdateCompanion<Quote> {
     required DateTime checkInDate,
     required DateTime checkOutDate,
     required int adultsCount,
-    this.childrenCount = const Value.absent(),
     required int depositCents,
     this.notes = const Value.absent(),
     this.status = const Value.absent(),
     this.reservationId = const Value.absent(),
+    this.reminderSentAt = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : propertyId = Value(propertyId),
@@ -4580,11 +4666,11 @@ class QuotesCompanion extends UpdateCompanion<Quote> {
     Expression<DateTime>? checkInDate,
     Expression<DateTime>? checkOutDate,
     Expression<int>? adultsCount,
-    Expression<int>? childrenCount,
     Expression<int>? depositCents,
     Expression<String>? notes,
     Expression<String>? status,
     Expression<String>? reservationId,
+    Expression<DateTime>? reminderSentAt,
     Expression<DateTime>? createdAt,
     Expression<int>? rowid,
   }) {
@@ -4597,11 +4683,11 @@ class QuotesCompanion extends UpdateCompanion<Quote> {
       if (checkInDate != null) 'check_in_date': checkInDate,
       if (checkOutDate != null) 'check_out_date': checkOutDate,
       if (adultsCount != null) 'adults_count': adultsCount,
-      if (childrenCount != null) 'children_count': childrenCount,
       if (depositCents != null) 'deposit_cents': depositCents,
       if (notes != null) 'notes': notes,
       if (status != null) 'status': status,
       if (reservationId != null) 'reservation_id': reservationId,
+      if (reminderSentAt != null) 'reminder_sent_at': reminderSentAt,
       if (createdAt != null) 'created_at': createdAt,
       if (rowid != null) 'rowid': rowid,
     });
@@ -4616,11 +4702,11 @@ class QuotesCompanion extends UpdateCompanion<Quote> {
     Value<DateTime>? checkInDate,
     Value<DateTime>? checkOutDate,
     Value<int>? adultsCount,
-    Value<int>? childrenCount,
     Value<int>? depositCents,
     Value<String?>? notes,
     Value<QuoteStatus>? status,
     Value<String?>? reservationId,
+    Value<DateTime?>? reminderSentAt,
     Value<DateTime>? createdAt,
     Value<int>? rowid,
   }) {
@@ -4633,11 +4719,11 @@ class QuotesCompanion extends UpdateCompanion<Quote> {
       checkInDate: checkInDate ?? this.checkInDate,
       checkOutDate: checkOutDate ?? this.checkOutDate,
       adultsCount: adultsCount ?? this.adultsCount,
-      childrenCount: childrenCount ?? this.childrenCount,
       depositCents: depositCents ?? this.depositCents,
       notes: notes ?? this.notes,
       status: status ?? this.status,
       reservationId: reservationId ?? this.reservationId,
+      reminderSentAt: reminderSentAt ?? this.reminderSentAt,
       createdAt: createdAt ?? this.createdAt,
       rowid: rowid ?? this.rowid,
     );
@@ -4670,9 +4756,6 @@ class QuotesCompanion extends UpdateCompanion<Quote> {
     if (adultsCount.present) {
       map['adults_count'] = Variable<int>(adultsCount.value);
     }
-    if (childrenCount.present) {
-      map['children_count'] = Variable<int>(childrenCount.value);
-    }
     if (depositCents.present) {
       map['deposit_cents'] = Variable<int>(depositCents.value);
     }
@@ -4686,6 +4769,9 @@ class QuotesCompanion extends UpdateCompanion<Quote> {
     }
     if (reservationId.present) {
       map['reservation_id'] = Variable<String>(reservationId.value);
+    }
+    if (reminderSentAt.present) {
+      map['reminder_sent_at'] = Variable<DateTime>(reminderSentAt.value);
     }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
@@ -4707,11 +4793,11 @@ class QuotesCompanion extends UpdateCompanion<Quote> {
           ..write('checkInDate: $checkInDate, ')
           ..write('checkOutDate: $checkOutDate, ')
           ..write('adultsCount: $adultsCount, ')
-          ..write('childrenCount: $childrenCount, ')
           ..write('depositCents: $depositCents, ')
           ..write('notes: $notes, ')
           ..write('status: $status, ')
           ..write('reservationId: $reservationId, ')
+          ..write('reminderSentAt: $reminderSentAt, ')
           ..write('createdAt: $createdAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -4769,26 +4855,8 @@ class $QuoteDayLinesTable extends QuoteDayLines
     type: DriftSqlType.int,
     requiredDuringInsert: true,
   );
-  static const VerificationMeta _childrenRateCentsMeta = const VerificationMeta(
-    'childrenRateCents',
-  );
   @override
-  late final GeneratedColumn<int> childrenRateCents = GeneratedColumn<int>(
-    'children_rate_cents',
-    aliasedName,
-    false,
-    type: DriftSqlType.int,
-    requiredDuringInsert: false,
-    defaultValue: const Constant(0),
-  );
-  @override
-  List<GeneratedColumn> get $columns => [
-    id,
-    quoteId,
-    date,
-    adultsRateCents,
-    childrenRateCents,
-  ];
+  List<GeneratedColumn> get $columns => [id, quoteId, date, adultsRateCents];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -4831,15 +4899,6 @@ class $QuoteDayLinesTable extends QuoteDayLines
     } else if (isInserting) {
       context.missing(_adultsRateCentsMeta);
     }
-    if (data.containsKey('children_rate_cents')) {
-      context.handle(
-        _childrenRateCentsMeta,
-        childrenRateCents.isAcceptableOrUnknown(
-          data['children_rate_cents']!,
-          _childrenRateCentsMeta,
-        ),
-      );
-    }
     return context;
   }
 
@@ -4869,10 +4928,6 @@ class $QuoteDayLinesTable extends QuoteDayLines
         DriftSqlType.int,
         data['${effectivePrefix}adults_rate_cents'],
       )!,
-      childrenRateCents: attachedDatabase.typeMapping.read(
-        DriftSqlType.int,
-        data['${effectivePrefix}children_rate_cents'],
-      )!,
     );
   }
 
@@ -4887,13 +4942,11 @@ class QuoteDayLine extends DataClass implements Insertable<QuoteDayLine> {
   final String quoteId;
   final DateTime date;
   final int adultsRateCents;
-  final int childrenRateCents;
   const QuoteDayLine({
     required this.id,
     required this.quoteId,
     required this.date,
     required this.adultsRateCents,
-    required this.childrenRateCents,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -4902,7 +4955,6 @@ class QuoteDayLine extends DataClass implements Insertable<QuoteDayLine> {
     map['quote_id'] = Variable<String>(quoteId);
     map['date'] = Variable<DateTime>(date);
     map['adults_rate_cents'] = Variable<int>(adultsRateCents);
-    map['children_rate_cents'] = Variable<int>(childrenRateCents);
     return map;
   }
 
@@ -4912,7 +4964,6 @@ class QuoteDayLine extends DataClass implements Insertable<QuoteDayLine> {
       quoteId: Value(quoteId),
       date: Value(date),
       adultsRateCents: Value(adultsRateCents),
-      childrenRateCents: Value(childrenRateCents),
     );
   }
 
@@ -4926,7 +4977,6 @@ class QuoteDayLine extends DataClass implements Insertable<QuoteDayLine> {
       quoteId: serializer.fromJson<String>(json['quoteId']),
       date: serializer.fromJson<DateTime>(json['date']),
       adultsRateCents: serializer.fromJson<int>(json['adultsRateCents']),
-      childrenRateCents: serializer.fromJson<int>(json['childrenRateCents']),
     );
   }
   @override
@@ -4937,7 +4987,6 @@ class QuoteDayLine extends DataClass implements Insertable<QuoteDayLine> {
       'quoteId': serializer.toJson<String>(quoteId),
       'date': serializer.toJson<DateTime>(date),
       'adultsRateCents': serializer.toJson<int>(adultsRateCents),
-      'childrenRateCents': serializer.toJson<int>(childrenRateCents),
     };
   }
 
@@ -4946,13 +4995,11 @@ class QuoteDayLine extends DataClass implements Insertable<QuoteDayLine> {
     String? quoteId,
     DateTime? date,
     int? adultsRateCents,
-    int? childrenRateCents,
   }) => QuoteDayLine(
     id: id ?? this.id,
     quoteId: quoteId ?? this.quoteId,
     date: date ?? this.date,
     adultsRateCents: adultsRateCents ?? this.adultsRateCents,
-    childrenRateCents: childrenRateCents ?? this.childrenRateCents,
   );
   QuoteDayLine copyWithCompanion(QuoteDayLinesCompanion data) {
     return QuoteDayLine(
@@ -4962,9 +5009,6 @@ class QuoteDayLine extends DataClass implements Insertable<QuoteDayLine> {
       adultsRateCents: data.adultsRateCents.present
           ? data.adultsRateCents.value
           : this.adultsRateCents,
-      childrenRateCents: data.childrenRateCents.present
-          ? data.childrenRateCents.value
-          : this.childrenRateCents,
     );
   }
 
@@ -4974,15 +5018,13 @@ class QuoteDayLine extends DataClass implements Insertable<QuoteDayLine> {
           ..write('id: $id, ')
           ..write('quoteId: $quoteId, ')
           ..write('date: $date, ')
-          ..write('adultsRateCents: $adultsRateCents, ')
-          ..write('childrenRateCents: $childrenRateCents')
+          ..write('adultsRateCents: $adultsRateCents')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode =>
-      Object.hash(id, quoteId, date, adultsRateCents, childrenRateCents);
+  int get hashCode => Object.hash(id, quoteId, date, adultsRateCents);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -4990,8 +5032,7 @@ class QuoteDayLine extends DataClass implements Insertable<QuoteDayLine> {
           other.id == this.id &&
           other.quoteId == this.quoteId &&
           other.date == this.date &&
-          other.adultsRateCents == this.adultsRateCents &&
-          other.childrenRateCents == this.childrenRateCents);
+          other.adultsRateCents == this.adultsRateCents);
 }
 
 class QuoteDayLinesCompanion extends UpdateCompanion<QuoteDayLine> {
@@ -4999,14 +5040,12 @@ class QuoteDayLinesCompanion extends UpdateCompanion<QuoteDayLine> {
   final Value<String> quoteId;
   final Value<DateTime> date;
   final Value<int> adultsRateCents;
-  final Value<int> childrenRateCents;
   final Value<int> rowid;
   const QuoteDayLinesCompanion({
     this.id = const Value.absent(),
     this.quoteId = const Value.absent(),
     this.date = const Value.absent(),
     this.adultsRateCents = const Value.absent(),
-    this.childrenRateCents = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   QuoteDayLinesCompanion.insert({
@@ -5014,7 +5053,6 @@ class QuoteDayLinesCompanion extends UpdateCompanion<QuoteDayLine> {
     required String quoteId,
     required DateTime date,
     required int adultsRateCents,
-    this.childrenRateCents = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : quoteId = Value(quoteId),
        date = Value(date),
@@ -5024,7 +5062,6 @@ class QuoteDayLinesCompanion extends UpdateCompanion<QuoteDayLine> {
     Expression<String>? quoteId,
     Expression<DateTime>? date,
     Expression<int>? adultsRateCents,
-    Expression<int>? childrenRateCents,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -5032,7 +5069,6 @@ class QuoteDayLinesCompanion extends UpdateCompanion<QuoteDayLine> {
       if (quoteId != null) 'quote_id': quoteId,
       if (date != null) 'date': date,
       if (adultsRateCents != null) 'adults_rate_cents': adultsRateCents,
-      if (childrenRateCents != null) 'children_rate_cents': childrenRateCents,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -5042,7 +5078,6 @@ class QuoteDayLinesCompanion extends UpdateCompanion<QuoteDayLine> {
     Value<String>? quoteId,
     Value<DateTime>? date,
     Value<int>? adultsRateCents,
-    Value<int>? childrenRateCents,
     Value<int>? rowid,
   }) {
     return QuoteDayLinesCompanion(
@@ -5050,7 +5085,6 @@ class QuoteDayLinesCompanion extends UpdateCompanion<QuoteDayLine> {
       quoteId: quoteId ?? this.quoteId,
       date: date ?? this.date,
       adultsRateCents: adultsRateCents ?? this.adultsRateCents,
-      childrenRateCents: childrenRateCents ?? this.childrenRateCents,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -5070,9 +5104,6 @@ class QuoteDayLinesCompanion extends UpdateCompanion<QuoteDayLine> {
     if (adultsRateCents.present) {
       map['adults_rate_cents'] = Variable<int>(adultsRateCents.value);
     }
-    if (childrenRateCents.present) {
-      map['children_rate_cents'] = Variable<int>(childrenRateCents.value);
-    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -5086,7 +5117,624 @@ class QuoteDayLinesCompanion extends UpdateCompanion<QuoteDayLine> {
           ..write('quoteId: $quoteId, ')
           ..write('date: $date, ')
           ..write('adultsRateCents: $adultsRateCents, ')
-          ..write('childrenRateCents: $childrenRateCents, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $QuoteChildGroupsTable extends QuoteChildGroups
+    with TableInfo<$QuoteChildGroupsTable, QuoteChildGroup> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $QuoteChildGroupsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    clientDefault: () => const Uuid().v4(),
+  );
+  static const VerificationMeta _quoteIdMeta = const VerificationMeta(
+    'quoteId',
+  );
+  @override
+  late final GeneratedColumn<String> quoteId = GeneratedColumn<String>(
+    'quote_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES quotes (id)',
+    ),
+  );
+  static const VerificationMeta _countMeta = const VerificationMeta('count');
+  @override
+  late final GeneratedColumn<int> count = GeneratedColumn<int>(
+    'count',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _sortOrderMeta = const VerificationMeta(
+    'sortOrder',
+  );
+  @override
+  late final GeneratedColumn<int> sortOrder = GeneratedColumn<int>(
+    'sort_order',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [id, quoteId, count, sortOrder];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'quote_child_groups';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<QuoteChildGroup> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('quote_id')) {
+      context.handle(
+        _quoteIdMeta,
+        quoteId.isAcceptableOrUnknown(data['quote_id']!, _quoteIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_quoteIdMeta);
+    }
+    if (data.containsKey('count')) {
+      context.handle(
+        _countMeta,
+        count.isAcceptableOrUnknown(data['count']!, _countMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_countMeta);
+    }
+    if (data.containsKey('sort_order')) {
+      context.handle(
+        _sortOrderMeta,
+        sortOrder.isAcceptableOrUnknown(data['sort_order']!, _sortOrderMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  QuoteChildGroup map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return QuoteChildGroup(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      quoteId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}quote_id'],
+      )!,
+      count: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}count'],
+      )!,
+      sortOrder: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}sort_order'],
+      )!,
+    );
+  }
+
+  @override
+  $QuoteChildGroupsTable createAlias(String alias) {
+    return $QuoteChildGroupsTable(attachedDatabase, alias);
+  }
+}
+
+class QuoteChildGroup extends DataClass implements Insertable<QuoteChildGroup> {
+  final String id;
+  final String quoteId;
+  final int count;
+  final int sortOrder;
+  const QuoteChildGroup({
+    required this.id,
+    required this.quoteId,
+    required this.count,
+    required this.sortOrder,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['quote_id'] = Variable<String>(quoteId);
+    map['count'] = Variable<int>(count);
+    map['sort_order'] = Variable<int>(sortOrder);
+    return map;
+  }
+
+  QuoteChildGroupsCompanion toCompanion(bool nullToAbsent) {
+    return QuoteChildGroupsCompanion(
+      id: Value(id),
+      quoteId: Value(quoteId),
+      count: Value(count),
+      sortOrder: Value(sortOrder),
+    );
+  }
+
+  factory QuoteChildGroup.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return QuoteChildGroup(
+      id: serializer.fromJson<String>(json['id']),
+      quoteId: serializer.fromJson<String>(json['quoteId']),
+      count: serializer.fromJson<int>(json['count']),
+      sortOrder: serializer.fromJson<int>(json['sortOrder']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'quoteId': serializer.toJson<String>(quoteId),
+      'count': serializer.toJson<int>(count),
+      'sortOrder': serializer.toJson<int>(sortOrder),
+    };
+  }
+
+  QuoteChildGroup copyWith({
+    String? id,
+    String? quoteId,
+    int? count,
+    int? sortOrder,
+  }) => QuoteChildGroup(
+    id: id ?? this.id,
+    quoteId: quoteId ?? this.quoteId,
+    count: count ?? this.count,
+    sortOrder: sortOrder ?? this.sortOrder,
+  );
+  QuoteChildGroup copyWithCompanion(QuoteChildGroupsCompanion data) {
+    return QuoteChildGroup(
+      id: data.id.present ? data.id.value : this.id,
+      quoteId: data.quoteId.present ? data.quoteId.value : this.quoteId,
+      count: data.count.present ? data.count.value : this.count,
+      sortOrder: data.sortOrder.present ? data.sortOrder.value : this.sortOrder,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('QuoteChildGroup(')
+          ..write('id: $id, ')
+          ..write('quoteId: $quoteId, ')
+          ..write('count: $count, ')
+          ..write('sortOrder: $sortOrder')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, quoteId, count, sortOrder);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is QuoteChildGroup &&
+          other.id == this.id &&
+          other.quoteId == this.quoteId &&
+          other.count == this.count &&
+          other.sortOrder == this.sortOrder);
+}
+
+class QuoteChildGroupsCompanion extends UpdateCompanion<QuoteChildGroup> {
+  final Value<String> id;
+  final Value<String> quoteId;
+  final Value<int> count;
+  final Value<int> sortOrder;
+  final Value<int> rowid;
+  const QuoteChildGroupsCompanion({
+    this.id = const Value.absent(),
+    this.quoteId = const Value.absent(),
+    this.count = const Value.absent(),
+    this.sortOrder = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  QuoteChildGroupsCompanion.insert({
+    this.id = const Value.absent(),
+    required String quoteId,
+    required int count,
+    this.sortOrder = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : quoteId = Value(quoteId),
+       count = Value(count);
+  static Insertable<QuoteChildGroup> custom({
+    Expression<String>? id,
+    Expression<String>? quoteId,
+    Expression<int>? count,
+    Expression<int>? sortOrder,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (quoteId != null) 'quote_id': quoteId,
+      if (count != null) 'count': count,
+      if (sortOrder != null) 'sort_order': sortOrder,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  QuoteChildGroupsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? quoteId,
+    Value<int>? count,
+    Value<int>? sortOrder,
+    Value<int>? rowid,
+  }) {
+    return QuoteChildGroupsCompanion(
+      id: id ?? this.id,
+      quoteId: quoteId ?? this.quoteId,
+      count: count ?? this.count,
+      sortOrder: sortOrder ?? this.sortOrder,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (quoteId.present) {
+      map['quote_id'] = Variable<String>(quoteId.value);
+    }
+    if (count.present) {
+      map['count'] = Variable<int>(count.value);
+    }
+    if (sortOrder.present) {
+      map['sort_order'] = Variable<int>(sortOrder.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('QuoteChildGroupsCompanion(')
+          ..write('id: $id, ')
+          ..write('quoteId: $quoteId, ')
+          ..write('count: $count, ')
+          ..write('sortOrder: $sortOrder, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $QuoteChildRatesTable extends QuoteChildRates
+    with TableInfo<$QuoteChildRatesTable, QuoteChildRate> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $QuoteChildRatesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    clientDefault: () => const Uuid().v4(),
+  );
+  static const VerificationMeta _groupIdMeta = const VerificationMeta(
+    'groupId',
+  );
+  @override
+  late final GeneratedColumn<String> groupId = GeneratedColumn<String>(
+    'group_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES quote_child_groups (id)',
+    ),
+  );
+  static const VerificationMeta _dateMeta = const VerificationMeta('date');
+  @override
+  late final GeneratedColumn<DateTime> date = GeneratedColumn<DateTime>(
+    'date',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _rateCentsMeta = const VerificationMeta(
+    'rateCents',
+  );
+  @override
+  late final GeneratedColumn<int> rateCents = GeneratedColumn<int>(
+    'rate_cents',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [id, groupId, date, rateCents];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'quote_child_rates';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<QuoteChildRate> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('group_id')) {
+      context.handle(
+        _groupIdMeta,
+        groupId.isAcceptableOrUnknown(data['group_id']!, _groupIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_groupIdMeta);
+    }
+    if (data.containsKey('date')) {
+      context.handle(
+        _dateMeta,
+        date.isAcceptableOrUnknown(data['date']!, _dateMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_dateMeta);
+    }
+    if (data.containsKey('rate_cents')) {
+      context.handle(
+        _rateCentsMeta,
+        rateCents.isAcceptableOrUnknown(data['rate_cents']!, _rateCentsMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  List<Set<GeneratedColumn>> get uniqueKeys => [
+    {groupId, date},
+  ];
+  @override
+  QuoteChildRate map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return QuoteChildRate(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      groupId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}group_id'],
+      )!,
+      date: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}date'],
+      )!,
+      rateCents: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}rate_cents'],
+      )!,
+    );
+  }
+
+  @override
+  $QuoteChildRatesTable createAlias(String alias) {
+    return $QuoteChildRatesTable(attachedDatabase, alias);
+  }
+}
+
+class QuoteChildRate extends DataClass implements Insertable<QuoteChildRate> {
+  final String id;
+  final String groupId;
+  final DateTime date;
+  final int rateCents;
+  const QuoteChildRate({
+    required this.id,
+    required this.groupId,
+    required this.date,
+    required this.rateCents,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['group_id'] = Variable<String>(groupId);
+    map['date'] = Variable<DateTime>(date);
+    map['rate_cents'] = Variable<int>(rateCents);
+    return map;
+  }
+
+  QuoteChildRatesCompanion toCompanion(bool nullToAbsent) {
+    return QuoteChildRatesCompanion(
+      id: Value(id),
+      groupId: Value(groupId),
+      date: Value(date),
+      rateCents: Value(rateCents),
+    );
+  }
+
+  factory QuoteChildRate.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return QuoteChildRate(
+      id: serializer.fromJson<String>(json['id']),
+      groupId: serializer.fromJson<String>(json['groupId']),
+      date: serializer.fromJson<DateTime>(json['date']),
+      rateCents: serializer.fromJson<int>(json['rateCents']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'groupId': serializer.toJson<String>(groupId),
+      'date': serializer.toJson<DateTime>(date),
+      'rateCents': serializer.toJson<int>(rateCents),
+    };
+  }
+
+  QuoteChildRate copyWith({
+    String? id,
+    String? groupId,
+    DateTime? date,
+    int? rateCents,
+  }) => QuoteChildRate(
+    id: id ?? this.id,
+    groupId: groupId ?? this.groupId,
+    date: date ?? this.date,
+    rateCents: rateCents ?? this.rateCents,
+  );
+  QuoteChildRate copyWithCompanion(QuoteChildRatesCompanion data) {
+    return QuoteChildRate(
+      id: data.id.present ? data.id.value : this.id,
+      groupId: data.groupId.present ? data.groupId.value : this.groupId,
+      date: data.date.present ? data.date.value : this.date,
+      rateCents: data.rateCents.present ? data.rateCents.value : this.rateCents,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('QuoteChildRate(')
+          ..write('id: $id, ')
+          ..write('groupId: $groupId, ')
+          ..write('date: $date, ')
+          ..write('rateCents: $rateCents')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, groupId, date, rateCents);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is QuoteChildRate &&
+          other.id == this.id &&
+          other.groupId == this.groupId &&
+          other.date == this.date &&
+          other.rateCents == this.rateCents);
+}
+
+class QuoteChildRatesCompanion extends UpdateCompanion<QuoteChildRate> {
+  final Value<String> id;
+  final Value<String> groupId;
+  final Value<DateTime> date;
+  final Value<int> rateCents;
+  final Value<int> rowid;
+  const QuoteChildRatesCompanion({
+    this.id = const Value.absent(),
+    this.groupId = const Value.absent(),
+    this.date = const Value.absent(),
+    this.rateCents = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  QuoteChildRatesCompanion.insert({
+    this.id = const Value.absent(),
+    required String groupId,
+    required DateTime date,
+    this.rateCents = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : groupId = Value(groupId),
+       date = Value(date);
+  static Insertable<QuoteChildRate> custom({
+    Expression<String>? id,
+    Expression<String>? groupId,
+    Expression<DateTime>? date,
+    Expression<int>? rateCents,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (groupId != null) 'group_id': groupId,
+      if (date != null) 'date': date,
+      if (rateCents != null) 'rate_cents': rateCents,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  QuoteChildRatesCompanion copyWith({
+    Value<String>? id,
+    Value<String>? groupId,
+    Value<DateTime>? date,
+    Value<int>? rateCents,
+    Value<int>? rowid,
+  }) {
+    return QuoteChildRatesCompanion(
+      id: id ?? this.id,
+      groupId: groupId ?? this.groupId,
+      date: date ?? this.date,
+      rateCents: rateCents ?? this.rateCents,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (groupId.present) {
+      map['group_id'] = Variable<String>(groupId.value);
+    }
+    if (date.present) {
+      map['date'] = Variable<DateTime>(date.value);
+    }
+    if (rateCents.present) {
+      map['rate_cents'] = Variable<int>(rateCents.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('QuoteChildRatesCompanion(')
+          ..write('id: $id, ')
+          ..write('groupId: $groupId, ')
+          ..write('date: $date, ')
+          ..write('rateCents: $rateCents, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -5110,6 +5758,12 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $VehiclesTable vehicles = $VehiclesTable(this);
   late final $QuotesTable quotes = $QuotesTable(this);
   late final $QuoteDayLinesTable quoteDayLines = $QuoteDayLinesTable(this);
+  late final $QuoteChildGroupsTable quoteChildGroups = $QuoteChildGroupsTable(
+    this,
+  );
+  late final $QuoteChildRatesTable quoteChildRates = $QuoteChildRatesTable(
+    this,
+  );
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -5127,6 +5781,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     vehicles,
     quotes,
     quoteDayLines,
+    quoteChildGroups,
+    quoteChildRates,
   ];
 }
 
@@ -8303,6 +8959,7 @@ typedef $$AppSettingsTableCreateCompanionBuilder =
       Value<String> id,
       Value<String> currency,
       Value<int> quoteReminderDays,
+      Value<String?> reminderMessageTemplate,
       Value<int> rowid,
     });
 typedef $$AppSettingsTableUpdateCompanionBuilder =
@@ -8310,6 +8967,7 @@ typedef $$AppSettingsTableUpdateCompanionBuilder =
       Value<String> id,
       Value<String> currency,
       Value<int> quoteReminderDays,
+      Value<String?> reminderMessageTemplate,
       Value<int> rowid,
     });
 
@@ -8334,6 +8992,11 @@ class $$AppSettingsTableFilterComposer
 
   ColumnFilters<int> get quoteReminderDays => $composableBuilder(
     column: $table.quoteReminderDays,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get reminderMessageTemplate => $composableBuilder(
+    column: $table.reminderMessageTemplate,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -8361,6 +9024,11 @@ class $$AppSettingsTableOrderingComposer
     column: $table.quoteReminderDays,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<String> get reminderMessageTemplate => $composableBuilder(
+    column: $table.reminderMessageTemplate,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$AppSettingsTableAnnotationComposer
@@ -8380,6 +9048,11 @@ class $$AppSettingsTableAnnotationComposer
 
   GeneratedColumn<int> get quoteReminderDays => $composableBuilder(
     column: $table.quoteReminderDays,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get reminderMessageTemplate => $composableBuilder(
+    column: $table.reminderMessageTemplate,
     builder: (column) => column,
   );
 }
@@ -8418,11 +9091,13 @@ class $$AppSettingsTableTableManager
                 Value<String> id = const Value.absent(),
                 Value<String> currency = const Value.absent(),
                 Value<int> quoteReminderDays = const Value.absent(),
+                Value<String?> reminderMessageTemplate = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => AppSettingsCompanion(
                 id: id,
                 currency: currency,
                 quoteReminderDays: quoteReminderDays,
+                reminderMessageTemplate: reminderMessageTemplate,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -8430,11 +9105,13 @@ class $$AppSettingsTableTableManager
                 Value<String> id = const Value.absent(),
                 Value<String> currency = const Value.absent(),
                 Value<int> quoteReminderDays = const Value.absent(),
+                Value<String?> reminderMessageTemplate = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => AppSettingsCompanion.insert(
                 id: id,
                 currency: currency,
                 quoteReminderDays: quoteReminderDays,
+                reminderMessageTemplate: reminderMessageTemplate,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -8930,11 +9607,11 @@ typedef $$QuotesTableCreateCompanionBuilder =
       required DateTime checkInDate,
       required DateTime checkOutDate,
       required int adultsCount,
-      Value<int> childrenCount,
       required int depositCents,
       Value<String?> notes,
       Value<QuoteStatus> status,
       Value<String?> reservationId,
+      Value<DateTime?> reminderSentAt,
       Value<DateTime> createdAt,
       Value<int> rowid,
     });
@@ -8948,11 +9625,11 @@ typedef $$QuotesTableUpdateCompanionBuilder =
       Value<DateTime> checkInDate,
       Value<DateTime> checkOutDate,
       Value<int> adultsCount,
-      Value<int> childrenCount,
       Value<int> depositCents,
       Value<String?> notes,
       Value<QuoteStatus> status,
       Value<String?> reservationId,
+      Value<DateTime?> reminderSentAt,
       Value<DateTime> createdAt,
       Value<int> rowid,
     });
@@ -9033,6 +9710,26 @@ final class $$QuotesTableReferences
       manager.$state.copyWith(prefetchedData: cache),
     );
   }
+
+  static MultiTypedResultKey<$QuoteChildGroupsTable, List<QuoteChildGroup>>
+  _quoteChildGroupsRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.quoteChildGroups,
+    aliasName: $_aliasNameGenerator(db.quotes.id, db.quoteChildGroups.quoteId),
+  );
+
+  $$QuoteChildGroupsTableProcessedTableManager get quoteChildGroupsRefs {
+    final manager = $$QuoteChildGroupsTableTableManager(
+      $_db,
+      $_db.quoteChildGroups,
+    ).filter((f) => f.quoteId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(
+      _quoteChildGroupsRefsTable($_db),
+    );
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
 }
 
 class $$QuotesTableFilterComposer
@@ -9074,11 +9771,6 @@ class $$QuotesTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<int> get childrenCount => $composableBuilder(
-    column: $table.childrenCount,
-    builder: (column) => ColumnFilters(column),
-  );
-
   ColumnFilters<int> get depositCents => $composableBuilder(
     column: $table.depositCents,
     builder: (column) => ColumnFilters(column),
@@ -9094,6 +9786,11 @@ class $$QuotesTableFilterComposer
         column: $table.status,
         builder: (column) => ColumnWithTypeConverterFilters(column),
       );
+
+  ColumnFilters<DateTime> get reminderSentAt => $composableBuilder(
+    column: $table.reminderSentAt,
+    builder: (column) => ColumnFilters(column),
+  );
 
   ColumnFilters<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
@@ -9193,6 +9890,31 @@ class $$QuotesTableFilterComposer
     );
     return f(composer);
   }
+
+  Expression<bool> quoteChildGroupsRefs(
+    Expression<bool> Function($$QuoteChildGroupsTableFilterComposer f) f,
+  ) {
+    final $$QuoteChildGroupsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.quoteChildGroups,
+      getReferencedColumn: (t) => t.quoteId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$QuoteChildGroupsTableFilterComposer(
+            $db: $db,
+            $table: $db.quoteChildGroups,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
 }
 
 class $$QuotesTableOrderingComposer
@@ -9234,11 +9956,6 @@ class $$QuotesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<int> get childrenCount => $composableBuilder(
-    column: $table.childrenCount,
-    builder: (column) => ColumnOrderings(column),
-  );
-
   ColumnOrderings<int> get depositCents => $composableBuilder(
     column: $table.depositCents,
     builder: (column) => ColumnOrderings(column),
@@ -9251,6 +9968,11 @@ class $$QuotesTableOrderingComposer
 
   ColumnOrderings<String> get status => $composableBuilder(
     column: $table.status,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get reminderSentAt => $composableBuilder(
+    column: $table.reminderSentAt,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -9364,11 +10086,6 @@ class $$QuotesTableAnnotationComposer
     builder: (column) => column,
   );
 
-  GeneratedColumn<int> get childrenCount => $composableBuilder(
-    column: $table.childrenCount,
-    builder: (column) => column,
-  );
-
   GeneratedColumn<int> get depositCents => $composableBuilder(
     column: $table.depositCents,
     builder: (column) => column,
@@ -9379,6 +10096,11 @@ class $$QuotesTableAnnotationComposer
 
   GeneratedColumnWithTypeConverter<QuoteStatus, String> get status =>
       $composableBuilder(column: $table.status, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get reminderSentAt => $composableBuilder(
+    column: $table.reminderSentAt,
+    builder: (column) => column,
+  );
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
@@ -9476,6 +10198,31 @@ class $$QuotesTableAnnotationComposer
     );
     return f(composer);
   }
+
+  Expression<T> quoteChildGroupsRefs<T extends Object>(
+    Expression<T> Function($$QuoteChildGroupsTableAnnotationComposer a) f,
+  ) {
+    final $$QuoteChildGroupsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.quoteChildGroups,
+      getReferencedColumn: (t) => t.quoteId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$QuoteChildGroupsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.quoteChildGroups,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
 }
 
 class $$QuotesTableTableManager
@@ -9496,6 +10243,7 @@ class $$QuotesTableTableManager
             bool roomId,
             bool reservationId,
             bool quoteDayLinesRefs,
+            bool quoteChildGroupsRefs,
           })
         > {
   $$QuotesTableTableManager(_$AppDatabase db, $QuotesTable table)
@@ -9519,11 +10267,11 @@ class $$QuotesTableTableManager
                 Value<DateTime> checkInDate = const Value.absent(),
                 Value<DateTime> checkOutDate = const Value.absent(),
                 Value<int> adultsCount = const Value.absent(),
-                Value<int> childrenCount = const Value.absent(),
                 Value<int> depositCents = const Value.absent(),
                 Value<String?> notes = const Value.absent(),
                 Value<QuoteStatus> status = const Value.absent(),
                 Value<String?> reservationId = const Value.absent(),
+                Value<DateTime?> reminderSentAt = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => QuotesCompanion(
@@ -9535,11 +10283,11 @@ class $$QuotesTableTableManager
                 checkInDate: checkInDate,
                 checkOutDate: checkOutDate,
                 adultsCount: adultsCount,
-                childrenCount: childrenCount,
                 depositCents: depositCents,
                 notes: notes,
                 status: status,
                 reservationId: reservationId,
+                reminderSentAt: reminderSentAt,
                 createdAt: createdAt,
                 rowid: rowid,
               ),
@@ -9553,11 +10301,11 @@ class $$QuotesTableTableManager
                 required DateTime checkInDate,
                 required DateTime checkOutDate,
                 required int adultsCount,
-                Value<int> childrenCount = const Value.absent(),
                 required int depositCents,
                 Value<String?> notes = const Value.absent(),
                 Value<QuoteStatus> status = const Value.absent(),
                 Value<String?> reservationId = const Value.absent(),
+                Value<DateTime?> reminderSentAt = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => QuotesCompanion.insert(
@@ -9569,11 +10317,11 @@ class $$QuotesTableTableManager
                 checkInDate: checkInDate,
                 checkOutDate: checkOutDate,
                 adultsCount: adultsCount,
-                childrenCount: childrenCount,
                 depositCents: depositCents,
                 notes: notes,
                 status: status,
                 reservationId: reservationId,
+                reminderSentAt: reminderSentAt,
                 createdAt: createdAt,
                 rowid: rowid,
               ),
@@ -9589,11 +10337,13 @@ class $$QuotesTableTableManager
                 roomId = false,
                 reservationId = false,
                 quoteDayLinesRefs = false,
+                quoteChildGroupsRefs = false,
               }) {
                 return PrefetchHooks(
                   db: db,
                   explicitlyWatchedTables: [
                     if (quoteDayLinesRefs) db.quoteDayLines,
+                    if (quoteChildGroupsRefs) db.quoteChildGroups,
                   ],
                   addJoins:
                       <
@@ -9676,6 +10426,27 @@ class $$QuotesTableTableManager
                               ),
                           typedResults: items,
                         ),
+                      if (quoteChildGroupsRefs)
+                        await $_getPrefetchedData<
+                          Quote,
+                          $QuotesTable,
+                          QuoteChildGroup
+                        >(
+                          currentTable: table,
+                          referencedTable: $$QuotesTableReferences
+                              ._quoteChildGroupsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$QuotesTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).quoteChildGroupsRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.quoteId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
                     ];
                   },
                 );
@@ -9701,6 +10472,7 @@ typedef $$QuotesTableProcessedTableManager =
         bool roomId,
         bool reservationId,
         bool quoteDayLinesRefs,
+        bool quoteChildGroupsRefs,
       })
     >;
 typedef $$QuoteDayLinesTableCreateCompanionBuilder =
@@ -9709,7 +10481,6 @@ typedef $$QuoteDayLinesTableCreateCompanionBuilder =
       required String quoteId,
       required DateTime date,
       required int adultsRateCents,
-      Value<int> childrenRateCents,
       Value<int> rowid,
     });
 typedef $$QuoteDayLinesTableUpdateCompanionBuilder =
@@ -9718,7 +10489,6 @@ typedef $$QuoteDayLinesTableUpdateCompanionBuilder =
       Value<String> quoteId,
       Value<DateTime> date,
       Value<int> adultsRateCents,
-      Value<int> childrenRateCents,
       Value<int> rowid,
     });
 
@@ -9773,11 +10543,6 @@ class $$QuoteDayLinesTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<int> get childrenRateCents => $composableBuilder(
-    column: $table.childrenRateCents,
-    builder: (column) => ColumnFilters(column),
-  );
-
   $$QuotesTableFilterComposer get quoteId {
     final $$QuotesTableFilterComposer composer = $composerBuilder(
       composer: this,
@@ -9826,11 +10591,6 @@ class $$QuoteDayLinesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<int> get childrenRateCents => $composableBuilder(
-    column: $table.childrenRateCents,
-    builder: (column) => ColumnOrderings(column),
-  );
-
   $$QuotesTableOrderingComposer get quoteId {
     final $$QuotesTableOrderingComposer composer = $composerBuilder(
       composer: this,
@@ -9872,11 +10632,6 @@ class $$QuoteDayLinesTableAnnotationComposer
 
   GeneratedColumn<int> get adultsRateCents => $composableBuilder(
     column: $table.adultsRateCents,
-    builder: (column) => column,
-  );
-
-  GeneratedColumn<int> get childrenRateCents => $composableBuilder(
-    column: $table.childrenRateCents,
     builder: (column) => column,
   );
 
@@ -9936,14 +10691,12 @@ class $$QuoteDayLinesTableTableManager
                 Value<String> quoteId = const Value.absent(),
                 Value<DateTime> date = const Value.absent(),
                 Value<int> adultsRateCents = const Value.absent(),
-                Value<int> childrenRateCents = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => QuoteDayLinesCompanion(
                 id: id,
                 quoteId: quoteId,
                 date: date,
                 adultsRateCents: adultsRateCents,
-                childrenRateCents: childrenRateCents,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -9952,14 +10705,12 @@ class $$QuoteDayLinesTableTableManager
                 required String quoteId,
                 required DateTime date,
                 required int adultsRateCents,
-                Value<int> childrenRateCents = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => QuoteDayLinesCompanion.insert(
                 id: id,
                 quoteId: quoteId,
                 date: date,
                 adultsRateCents: adultsRateCents,
-                childrenRateCents: childrenRateCents,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -10029,6 +10780,724 @@ typedef $$QuoteDayLinesTableProcessedTableManager =
       QuoteDayLine,
       PrefetchHooks Function({bool quoteId})
     >;
+typedef $$QuoteChildGroupsTableCreateCompanionBuilder =
+    QuoteChildGroupsCompanion Function({
+      Value<String> id,
+      required String quoteId,
+      required int count,
+      Value<int> sortOrder,
+      Value<int> rowid,
+    });
+typedef $$QuoteChildGroupsTableUpdateCompanionBuilder =
+    QuoteChildGroupsCompanion Function({
+      Value<String> id,
+      Value<String> quoteId,
+      Value<int> count,
+      Value<int> sortOrder,
+      Value<int> rowid,
+    });
+
+final class $$QuoteChildGroupsTableReferences
+    extends
+        BaseReferences<_$AppDatabase, $QuoteChildGroupsTable, QuoteChildGroup> {
+  $$QuoteChildGroupsTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static $QuotesTable _quoteIdTable(_$AppDatabase db) => db.quotes.createAlias(
+    $_aliasNameGenerator(db.quoteChildGroups.quoteId, db.quotes.id),
+  );
+
+  $$QuotesTableProcessedTableManager get quoteId {
+    final $_column = $_itemColumn<String>('quote_id')!;
+
+    final manager = $$QuotesTableTableManager(
+      $_db,
+      $_db.quotes,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_quoteIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+
+  static MultiTypedResultKey<$QuoteChildRatesTable, List<QuoteChildRate>>
+  _quoteChildRatesRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.quoteChildRates,
+    aliasName: $_aliasNameGenerator(
+      db.quoteChildGroups.id,
+      db.quoteChildRates.groupId,
+    ),
+  );
+
+  $$QuoteChildRatesTableProcessedTableManager get quoteChildRatesRefs {
+    final manager = $$QuoteChildRatesTableTableManager(
+      $_db,
+      $_db.quoteChildRates,
+    ).filter((f) => f.groupId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(
+      _quoteChildRatesRefsTable($_db),
+    );
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+}
+
+class $$QuoteChildGroupsTableFilterComposer
+    extends Composer<_$AppDatabase, $QuoteChildGroupsTable> {
+  $$QuoteChildGroupsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get count => $composableBuilder(
+    column: $table.count,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get sortOrder => $composableBuilder(
+    column: $table.sortOrder,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$QuotesTableFilterComposer get quoteId {
+    final $$QuotesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.quoteId,
+      referencedTable: $db.quotes,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$QuotesTableFilterComposer(
+            $db: $db,
+            $table: $db.quotes,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  Expression<bool> quoteChildRatesRefs(
+    Expression<bool> Function($$QuoteChildRatesTableFilterComposer f) f,
+  ) {
+    final $$QuoteChildRatesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.quoteChildRates,
+      getReferencedColumn: (t) => t.groupId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$QuoteChildRatesTableFilterComposer(
+            $db: $db,
+            $table: $db.quoteChildRates,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+}
+
+class $$QuoteChildGroupsTableOrderingComposer
+    extends Composer<_$AppDatabase, $QuoteChildGroupsTable> {
+  $$QuoteChildGroupsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get count => $composableBuilder(
+    column: $table.count,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get sortOrder => $composableBuilder(
+    column: $table.sortOrder,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$QuotesTableOrderingComposer get quoteId {
+    final $$QuotesTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.quoteId,
+      referencedTable: $db.quotes,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$QuotesTableOrderingComposer(
+            $db: $db,
+            $table: $db.quotes,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$QuoteChildGroupsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $QuoteChildGroupsTable> {
+  $$QuoteChildGroupsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<int> get count =>
+      $composableBuilder(column: $table.count, builder: (column) => column);
+
+  GeneratedColumn<int> get sortOrder =>
+      $composableBuilder(column: $table.sortOrder, builder: (column) => column);
+
+  $$QuotesTableAnnotationComposer get quoteId {
+    final $$QuotesTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.quoteId,
+      referencedTable: $db.quotes,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$QuotesTableAnnotationComposer(
+            $db: $db,
+            $table: $db.quotes,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  Expression<T> quoteChildRatesRefs<T extends Object>(
+    Expression<T> Function($$QuoteChildRatesTableAnnotationComposer a) f,
+  ) {
+    final $$QuoteChildRatesTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.quoteChildRates,
+      getReferencedColumn: (t) => t.groupId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$QuoteChildRatesTableAnnotationComposer(
+            $db: $db,
+            $table: $db.quoteChildRates,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+}
+
+class $$QuoteChildGroupsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $QuoteChildGroupsTable,
+          QuoteChildGroup,
+          $$QuoteChildGroupsTableFilterComposer,
+          $$QuoteChildGroupsTableOrderingComposer,
+          $$QuoteChildGroupsTableAnnotationComposer,
+          $$QuoteChildGroupsTableCreateCompanionBuilder,
+          $$QuoteChildGroupsTableUpdateCompanionBuilder,
+          (QuoteChildGroup, $$QuoteChildGroupsTableReferences),
+          QuoteChildGroup,
+          PrefetchHooks Function({bool quoteId, bool quoteChildRatesRefs})
+        > {
+  $$QuoteChildGroupsTableTableManager(
+    _$AppDatabase db,
+    $QuoteChildGroupsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$QuoteChildGroupsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$QuoteChildGroupsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$QuoteChildGroupsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> quoteId = const Value.absent(),
+                Value<int> count = const Value.absent(),
+                Value<int> sortOrder = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => QuoteChildGroupsCompanion(
+                id: id,
+                quoteId: quoteId,
+                count: count,
+                sortOrder: sortOrder,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                required String quoteId,
+                required int count,
+                Value<int> sortOrder = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => QuoteChildGroupsCompanion.insert(
+                id: id,
+                quoteId: quoteId,
+                count: count,
+                sortOrder: sortOrder,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$QuoteChildGroupsTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback:
+              ({quoteId = false, quoteChildRatesRefs = false}) {
+                return PrefetchHooks(
+                  db: db,
+                  explicitlyWatchedTables: [
+                    if (quoteChildRatesRefs) db.quoteChildRates,
+                  ],
+                  addJoins:
+                      <
+                        T extends TableManagerState<
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic
+                        >
+                      >(state) {
+                        if (quoteId) {
+                          state =
+                              state.withJoin(
+                                    currentTable: table,
+                                    currentColumn: table.quoteId,
+                                    referencedTable:
+                                        $$QuoteChildGroupsTableReferences
+                                            ._quoteIdTable(db),
+                                    referencedColumn:
+                                        $$QuoteChildGroupsTableReferences
+                                            ._quoteIdTable(db)
+                                            .id,
+                                  )
+                                  as T;
+                        }
+
+                        return state;
+                      },
+                  getPrefetchedDataCallback: (items) async {
+                    return [
+                      if (quoteChildRatesRefs)
+                        await $_getPrefetchedData<
+                          QuoteChildGroup,
+                          $QuoteChildGroupsTable,
+                          QuoteChildRate
+                        >(
+                          currentTable: table,
+                          referencedTable: $$QuoteChildGroupsTableReferences
+                              ._quoteChildRatesRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$QuoteChildGroupsTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).quoteChildRatesRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.groupId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
+                    ];
+                  },
+                );
+              },
+        ),
+      );
+}
+
+typedef $$QuoteChildGroupsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $QuoteChildGroupsTable,
+      QuoteChildGroup,
+      $$QuoteChildGroupsTableFilterComposer,
+      $$QuoteChildGroupsTableOrderingComposer,
+      $$QuoteChildGroupsTableAnnotationComposer,
+      $$QuoteChildGroupsTableCreateCompanionBuilder,
+      $$QuoteChildGroupsTableUpdateCompanionBuilder,
+      (QuoteChildGroup, $$QuoteChildGroupsTableReferences),
+      QuoteChildGroup,
+      PrefetchHooks Function({bool quoteId, bool quoteChildRatesRefs})
+    >;
+typedef $$QuoteChildRatesTableCreateCompanionBuilder =
+    QuoteChildRatesCompanion Function({
+      Value<String> id,
+      required String groupId,
+      required DateTime date,
+      Value<int> rateCents,
+      Value<int> rowid,
+    });
+typedef $$QuoteChildRatesTableUpdateCompanionBuilder =
+    QuoteChildRatesCompanion Function({
+      Value<String> id,
+      Value<String> groupId,
+      Value<DateTime> date,
+      Value<int> rateCents,
+      Value<int> rowid,
+    });
+
+final class $$QuoteChildRatesTableReferences
+    extends
+        BaseReferences<_$AppDatabase, $QuoteChildRatesTable, QuoteChildRate> {
+  $$QuoteChildRatesTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static $QuoteChildGroupsTable _groupIdTable(_$AppDatabase db) =>
+      db.quoteChildGroups.createAlias(
+        $_aliasNameGenerator(
+          db.quoteChildRates.groupId,
+          db.quoteChildGroups.id,
+        ),
+      );
+
+  $$QuoteChildGroupsTableProcessedTableManager get groupId {
+    final $_column = $_itemColumn<String>('group_id')!;
+
+    final manager = $$QuoteChildGroupsTableTableManager(
+      $_db,
+      $_db.quoteChildGroups,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_groupIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$QuoteChildRatesTableFilterComposer
+    extends Composer<_$AppDatabase, $QuoteChildRatesTable> {
+  $$QuoteChildRatesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get date => $composableBuilder(
+    column: $table.date,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get rateCents => $composableBuilder(
+    column: $table.rateCents,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$QuoteChildGroupsTableFilterComposer get groupId {
+    final $$QuoteChildGroupsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.groupId,
+      referencedTable: $db.quoteChildGroups,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$QuoteChildGroupsTableFilterComposer(
+            $db: $db,
+            $table: $db.quoteChildGroups,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$QuoteChildRatesTableOrderingComposer
+    extends Composer<_$AppDatabase, $QuoteChildRatesTable> {
+  $$QuoteChildRatesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get date => $composableBuilder(
+    column: $table.date,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get rateCents => $composableBuilder(
+    column: $table.rateCents,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$QuoteChildGroupsTableOrderingComposer get groupId {
+    final $$QuoteChildGroupsTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.groupId,
+      referencedTable: $db.quoteChildGroups,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$QuoteChildGroupsTableOrderingComposer(
+            $db: $db,
+            $table: $db.quoteChildGroups,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$QuoteChildRatesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $QuoteChildRatesTable> {
+  $$QuoteChildRatesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get date =>
+      $composableBuilder(column: $table.date, builder: (column) => column);
+
+  GeneratedColumn<int> get rateCents =>
+      $composableBuilder(column: $table.rateCents, builder: (column) => column);
+
+  $$QuoteChildGroupsTableAnnotationComposer get groupId {
+    final $$QuoteChildGroupsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.groupId,
+      referencedTable: $db.quoteChildGroups,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$QuoteChildGroupsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.quoteChildGroups,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$QuoteChildRatesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $QuoteChildRatesTable,
+          QuoteChildRate,
+          $$QuoteChildRatesTableFilterComposer,
+          $$QuoteChildRatesTableOrderingComposer,
+          $$QuoteChildRatesTableAnnotationComposer,
+          $$QuoteChildRatesTableCreateCompanionBuilder,
+          $$QuoteChildRatesTableUpdateCompanionBuilder,
+          (QuoteChildRate, $$QuoteChildRatesTableReferences),
+          QuoteChildRate,
+          PrefetchHooks Function({bool groupId})
+        > {
+  $$QuoteChildRatesTableTableManager(
+    _$AppDatabase db,
+    $QuoteChildRatesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$QuoteChildRatesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$QuoteChildRatesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$QuoteChildRatesTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> groupId = const Value.absent(),
+                Value<DateTime> date = const Value.absent(),
+                Value<int> rateCents = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => QuoteChildRatesCompanion(
+                id: id,
+                groupId: groupId,
+                date: date,
+                rateCents: rateCents,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                required String groupId,
+                required DateTime date,
+                Value<int> rateCents = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => QuoteChildRatesCompanion.insert(
+                id: id,
+                groupId: groupId,
+                date: date,
+                rateCents: rateCents,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$QuoteChildRatesTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({groupId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (groupId) {
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.groupId,
+                                referencedTable:
+                                    $$QuoteChildRatesTableReferences
+                                        ._groupIdTable(db),
+                                referencedColumn:
+                                    $$QuoteChildRatesTableReferences
+                                        ._groupIdTable(db)
+                                        .id,
+                              )
+                              as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$QuoteChildRatesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $QuoteChildRatesTable,
+      QuoteChildRate,
+      $$QuoteChildRatesTableFilterComposer,
+      $$QuoteChildRatesTableOrderingComposer,
+      $$QuoteChildRatesTableAnnotationComposer,
+      $$QuoteChildRatesTableCreateCompanionBuilder,
+      $$QuoteChildRatesTableUpdateCompanionBuilder,
+      (QuoteChildRate, $$QuoteChildRatesTableReferences),
+      QuoteChildRate,
+      PrefetchHooks Function({bool groupId})
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -10057,4 +11526,8 @@ class $AppDatabaseManager {
       $$QuotesTableTableManager(_db, _db.quotes);
   $$QuoteDayLinesTableTableManager get quoteDayLines =>
       $$QuoteDayLinesTableTableManager(_db, _db.quoteDayLines);
+  $$QuoteChildGroupsTableTableManager get quoteChildGroups =>
+      $$QuoteChildGroupsTableTableManager(_db, _db.quoteChildGroups);
+  $$QuoteChildRatesTableTableManager get quoteChildRates =>
+      $$QuoteChildRatesTableTableManager(_db, _db.quoteChildRates);
 }

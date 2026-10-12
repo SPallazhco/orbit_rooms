@@ -3,7 +3,7 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
-import 'package:orbit_rooms/core/database/app_database.dart';
+import 'package:orbit_rooms/features/quotes/domain/quote_pricing.dart';
 import 'package:orbit_rooms/features/quotes/presentation/widgets/quote_share_card.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
@@ -17,9 +17,8 @@ class QuoteSharePreviewPage extends StatefulWidget {
     required this.propertyName,
     required this.roomName,
     required this.guestName,
-    required this.dayLines,
+    required this.nights,
     required this.adultsCount,
-    required this.childrenCount,
     required this.totalCents,
     required this.depositCents,
     required this.balanceCents,
@@ -31,9 +30,8 @@ class QuoteSharePreviewPage extends StatefulWidget {
   final String propertyName;
   final String roomName;
   final String? guestName;
-  final List<QuoteDayLine> dayLines;
+  final List<QuoteNight> nights;
   final int adultsCount;
-  final int childrenCount;
   final int totalCents;
   final int depositCents;
   final int balanceCents;
@@ -85,9 +83,8 @@ class _QuoteSharePreviewPageState extends State<QuoteSharePreviewPage> {
             propertyName: widget.propertyName,
             roomName: widget.roomName,
             guestName: widget.guestName,
-            dayLines: widget.dayLines,
+            nights: widget.nights,
             adultsCount: widget.adultsCount,
-            childrenCount: widget.childrenCount,
             totalCents: widget.totalCents,
             depositCents: widget.depositCents,
             balanceCents: widget.balanceCents,

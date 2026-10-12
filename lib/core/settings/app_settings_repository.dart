@@ -56,4 +56,20 @@ class AppSettingsRepository {
           quoteReminderDays: Value(days),
         ),
       );
+
+  /// Texto personalizado del mensaje de recordatorio (con variables como
+  /// `{nombre}`); `null` = se usa el mensaje original de la app.
+  Stream<String?> watchReminderMessageTemplate() =>
+      (_db.select(_db.appSettings)..where((s) => s.id.equals(_settingsId)))
+          .watchSingleOrNull()
+          .map((row) => row?.reminderMessageTemplate);
+
+  Future<void> setReminderMessageTemplate(String? template) => _db
+      .into(_db.appSettings)
+      .insertOnConflictUpdate(
+        AppSettingsCompanion.insert(
+          id: const Value(_settingsId),
+          reminderMessageTemplate: Value(template),
+        ),
+      );
 }

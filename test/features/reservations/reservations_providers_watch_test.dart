@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:orbit_rooms/core/database/app_database.dart';
 import 'package:orbit_rooms/core/database/database_providers.dart';
 import 'package:orbit_rooms/features/reservations/data/reservation_repository.dart';
+import 'package:orbit_rooms/features/reservations/domain/reservation_timeline.dart';
 import 'package:orbit_rooms/features/reservations/reservations_providers.dart';
 import 'package:uuid/uuid.dart';
 
@@ -147,5 +148,50 @@ void main() {
     final history = container.read(reservationsForGuestProvider(guestId)).value;
     expect(history, hasLength(1));
     expect(history!.single.guestId, guestId);
+  });
+
+  test('reservationListProvider trae habitaciones, personas, lo cobrado y '
+      'la fase de cada reserva', () async {
+    final repository = ReservationRepository(db);
+    final today = DateTime.now();
+    DateTime inDays(int d) => DateTime(today.year, today.month, today.day + d);
+
+    final upcomingId = await repository.createGroupReservation(
+      guestId: guestId,
+      checkInDate: inDays(5),
+      checkOutDate: inDays(7),
+      roomAssignments: [RoomAssignmentInput(roomId: roomId, guestsCount: 3)],
+    );
+    final pastId = await repository.createGroupReservation(
+      guestId: guestId,
+      checkInDate: inDays(-5),
+      checkOutDate: inDays(-3),
+      roomAssignments: [RoomAssignmentInput(roomId: roomId, guestsCount: 2)],
+    );
+    await container
+        .read(registerPaymentUseCaseProvider)
+        .call(
+          reservationId: upcomingId,
+          amountCents: 1000,
+          method: PaymentMethod.cash,
+        );
+
+    container.listen(reservationListProvider, (_, _) {});
+    for (var i = 0; i < 8; i++) {
+      await Future<void>.delayed(Duration.zero);
+    }
+
+    final items = container.read(reservationListProvider).value!;
+    final upcoming = items.firstWhere((i) => i.reservation.id == upcomingId);
+    expect(upcoming.guestName, 'Ana Pérez');
+    expect(upcoming.roomNames, 'Cuarto 1');
+    expect(upcoming.guestsCount, 3);
+    expect(upcoming.paidCents, 1000);
+    expect(upcoming.phase, ReservationPhase.upcoming);
+
+    final past = items.firstWhere((i) => i.reservation.id == pastId);
+    expect(past.paidCents, 0);
+    expect(past.guestsCount, 2);
+    expect(past.phase, ReservationPhase.past);
   });
 }

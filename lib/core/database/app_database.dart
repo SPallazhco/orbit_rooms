@@ -11,6 +11,8 @@ import 'tables/guests_table.dart';
 import 'tables/holidays_table.dart';
 import 'tables/payments_table.dart';
 import 'tables/properties_table.dart';
+import 'tables/quote_child_groups_table.dart';
+import 'tables/quote_child_rates_table.dart';
 import 'tables/quote_day_lines_table.dart';
 import 'tables/quotes_table.dart';
 import 'tables/reservation_rooms_table.dart';
@@ -40,6 +42,8 @@ part 'app_database.g.dart';
     Vehicles,
     Quotes,
     QuoteDayLines,
+    QuoteChildGroups,
+    QuoteChildRates,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -50,7 +54,7 @@ class AppDatabase extends _$AppDatabase {
   factory AppDatabase.connect() => AppDatabase(_openConnection());
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 5;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -65,6 +69,30 @@ class AppDatabase extends _$AppDatabase {
       },
       from2To3: (m, schema) async {
         await m.addColumn(schema.vehicles, schema.vehicles.garageFeeCents);
+      },
+      from3To4: (m, schema) async {
+        await m.createTable(schema.quoteChildGroups);
+        await m.createTable(schema.quoteChildRates);
+        await customStatement('''
+          INSERT INTO quote_child_groups (id, quote_id, "count", sort_order)
+          SELECT lower(hex(randomblob(16))), id, children_count, 0
+          FROM quotes WHERE children_count > 0
+        ''');
+        await customStatement('''
+          INSERT INTO quote_child_rates (id, group_id, date, rate_cents)
+          SELECT lower(hex(randomblob(16))), g.id, l.date, l.children_rate_cents
+          FROM quote_day_lines l
+          JOIN quote_child_groups g ON g.quote_id = l.quote_id
+        ''');
+        await m.dropColumn(schema.quotes, 'children_count');
+        await m.dropColumn(schema.quoteDayLines, 'children_rate_cents');
+      },
+      from4To5: (m, schema) async {
+        await m.addColumn(schema.quotes, schema.quotes.reminderSentAt);
+        await m.addColumn(
+          schema.appSettings,
+          schema.appSettings.reminderMessageTemplate,
+        );
       },
     ),
     beforeOpen: (details) async {

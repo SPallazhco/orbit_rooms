@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:orbit_rooms/features/quotes/presentation/pages/quote_detail_page.dart';
+import 'package:orbit_rooms/features/quotes/presentation/pages/send_reminder_page.dart';
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 
 /// Le da navegación a la notificación al tocarla, sin depender de rutas con
-/// nombre (`QuoteDetailPage` necesita un `quoteId` que las rutas actuales no
+/// nombre (`SendReminderPage` necesita un `quoteId` que las rutas actuales no
 /// pasan como argumento).
 final rootNavigatorKey = GlobalKey<NavigatorState>();
 
@@ -53,7 +53,7 @@ class NotificationService {
     final quoteId = response.payload;
     if (quoteId == null) return;
     rootNavigatorKey.currentState?.push(
-      MaterialPageRoute(builder: (_) => QuoteDetailPage(quoteId: quoteId)),
+      MaterialPageRoute(builder: (_) => SendReminderPage(quoteId: quoteId)),
     );
   }
 

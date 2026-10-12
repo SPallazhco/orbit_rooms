@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:orbit_rooms/features/calendar/calendar_providers.dart';
 import 'package:orbit_rooms/features/properties/properties_providers.dart';
+import 'package:orbit_rooms/features/quotes/presentation/widgets/reminders_bell.dart';
 import 'package:orbit_rooms/features/reservations/presentation/pages/reservation_detail_page.dart';
 import 'package:orbit_rooms/shared/widgets/app_drawer.dart';
 
@@ -53,7 +54,10 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
     final propertiesAsync = ref.watch(activePropertiesProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Calendario')),
+      appBar: AppBar(
+        title: const Text('Calendario'),
+        actions: const [RemindersBell()],
+      ),
       drawer: const AppDrawer(),
       body: propertiesAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),

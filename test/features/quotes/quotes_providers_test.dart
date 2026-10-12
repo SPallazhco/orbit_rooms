@@ -68,7 +68,10 @@ void main() {
             checkInDate: DateTime(2026, 6, 4),
             checkOutDate: DateTime(2026, 6, 6),
             adultsCount: 3,
-            childrenCount: 1,
+            childGroups: [
+              (count: 3, rateCents: 700),
+              (count: 1, rateCents: 500),
+            ],
             guestName: 'Ana',
           );
       await Future<void>.delayed(Duration.zero);
@@ -82,6 +85,68 @@ void main() {
       await Future<void>.delayed(Duration.zero);
       final dayLines = container.read(quoteDayLinesProvider(quoteId)).value;
       expect(dayLines, hasLength(2));
+
+      final key = (quoteId: quoteId, adultsCount: 3);
+      container.listen(quoteBreakdownProvider(key), (_, _) {});
+      for (var i = 0; i < 5; i++) {
+        await Future<void>.delayed(Duration.zero);
+      }
+      final breakdown = container.read(quoteBreakdownProvider(key)).value!;
+      expect(breakdown.childrenCount, 4);
+      expect(breakdown.nights, hasLength(2));
+      // (1200+1500)*3 + (3*700 + 1*500)*2 = 8100 + 5200
+      expect(breakdown.totalCents, 13300);
+      expect(breakdown.hasUnpricedChildren, false);
     },
   );
+
+  test('reminderInboxProvider muestra solo cotizaciones pendientes con '
+      'check-in dentro de la ventana (3 días por defecto), separa las ya '
+      'recordadas y se vacía al reservar o rechazar', () async {
+    final repository = container.read(quoteRepositoryProvider);
+    final today = DateTime.now();
+    DateTime inDays(int days) =>
+        DateTime(today.year, today.month, today.day + days);
+
+    Future<String> quote(String name, int checkInDays) => repository.create(
+      propertyId: propertyId,
+      roomId: roomId,
+      checkInDate: inDays(checkInDays),
+      checkOutDate: inDays(checkInDays + 1),
+      adultsCount: 2,
+      guestName: name,
+    );
+
+    await quote('Fuera de ventana', 10);
+    await quote('Ya pasó', -1);
+    final hoy = await quote('Hoy', 0);
+    final en3 = await quote('En tres días', 3);
+    final recordada = await quote('Recordada', 2);
+    final rechazada = await quote('Rechazada', 1);
+    await repository.markReminderSent(recordada, DateTime.now());
+    await repository.updateStatus(rechazada, QuoteStatus.rejected);
+
+    container.listen(reminderInboxProvider, (_, _) {});
+    for (var i = 0; i < 8; i++) {
+      await Future<void>.delayed(Duration.zero);
+    }
+
+    var inbox = container.read(reminderInboxProvider).value!;
+    expect(inbox.toRemind.map((r) => r.quote.guestName), [
+      'Hoy',
+      'En tres días',
+    ]);
+    expect(inbox.toRemind.map((r) => r.daysLeft), [0, 3]);
+    expect(inbox.reminded.map((r) => r.quote.guestName), ['Recordada']);
+
+    await repository.updateStatus(hoy, QuoteStatus.reserved);
+    await repository.updateStatus(en3, QuoteStatus.rejected);
+    for (var i = 0; i < 8; i++) {
+      await Future<void>.delayed(Duration.zero);
+    }
+
+    inbox = container.read(reminderInboxProvider).value!;
+    expect(inbox.toRemind, isEmpty);
+    expect(inbox.reminded, hasLength(1));
+  });
 }

@@ -5,8 +5,10 @@ import 'package:orbit_rooms/core/notifications/notification_service.dart';
 import 'package:orbit_rooms/core/settings/settings_providers.dart';
 import 'package:orbit_rooms/features/guests/guests_providers.dart';
 import 'package:orbit_rooms/features/guests/presentation/widgets/add_guest_dialog.dart';
+import 'package:orbit_rooms/features/quotes/domain/quote_pricing.dart';
 import 'package:orbit_rooms/features/quotes/presentation/pages/quote_share_preview_page.dart';
 import 'package:orbit_rooms/features/quotes/presentation/quote_status_label.dart';
+import 'package:orbit_rooms/features/quotes/presentation/quote_title.dart';
 import 'package:orbit_rooms/features/quotes/presentation/widgets/edit_deposit_dialog.dart';
 import 'package:orbit_rooms/features/quotes/presentation/widgets/edit_quote_day_dialog.dart';
 import 'package:orbit_rooms/features/quotes/presentation/widgets/edit_quote_guest_dialog.dart';
@@ -30,7 +32,6 @@ class QuoteDetailPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final quotesAsync = ref.watch(quotesProvider);
-    final dayLinesAsync = ref.watch(quoteDayLinesProvider(quoteId));
     final currency = ref.watch(currencyProvider).value ?? 'USD';
 
     return Scaffold(
@@ -58,17 +59,18 @@ class QuoteDetailPage extends ConsumerWidget {
           final entry = found;
           final quote = entry.quote;
 
-          return dayLinesAsync.when(
+          final breakdownAsync = ref.watch(
+            quoteBreakdownProvider((
+              quoteId: quoteId,
+              adultsCount: quote.adultsCount,
+            )),
+          );
+
+          return breakdownAsync.when(
             loading: () => const Center(child: CircularProgressIndicator()),
             error: (error, _) => Center(child: Text('Error: $error')),
-            data: (dayLines) {
-              final totalCents = ref
-                  .read(quoteRepositoryProvider)
-                  .totalCentsFor(
-                    dayLines,
-                    adultsCount: quote.adultsCount,
-                    childrenCount: quote.childrenCount,
-                  );
+            data: (breakdown) {
+              final totalCents = breakdown.totalCents;
               final balanceCents = totalCents - quote.depositCents;
 
               return ListView(
@@ -79,7 +81,12 @@ class QuoteDetailPage extends ConsumerWidget {
                     children: [
                       Expanded(
                         child: Text(
-                          quote.guestName ?? 'Sin nombre todavía',
+                          quote.guestName ??
+                              quoteTitle(
+                                checkInDate: quote.checkInDate,
+                                adultsCount: quote.adultsCount,
+                                childrenCount: breakdown.childrenCount,
+                              ),
                           style: Theme.of(context).textTheme.titleLarge,
                         ),
                       ),
@@ -97,7 +104,10 @@ class QuoteDetailPage extends ConsumerWidget {
                     '${_formatDate(quote.checkOutDate)}',
                   ),
                   Text(
-                    '${quote.adultsCount} adultos, ${quote.childrenCount} niños',
+                    '${quote.adultsCount} '
+                    '${quote.adultsCount == 1 ? 'adulto' : 'adultos'}, '
+                    '${breakdown.childrenCount} '
+                    '${breakdown.childrenCount == 1 ? 'niño' : 'niños'}',
                   ),
                   const SizedBox(height: 4),
                   Text(
@@ -112,22 +122,52 @@ class QuoteDetailPage extends ConsumerWidget {
                     'Desglose por noche',
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
-                  for (final line in dayLines)
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: Text(_formatDate(line.date)),
-                      subtitle: Text(
-                        'Adulto: ${formatCents(line.adultsRateCents, currency)}'
-                        '${quote.childrenCount > 0 ? ' · Niño: ${formatCents(line.childrenRateCents, currency)}' : ''}',
-                      ),
-                      trailing: Text(
-                        formatCents(
-                          line.adultsRateCents * quote.adultsCount +
-                              line.childrenRateCents * quote.childrenCount,
-                          currency,
+                  if (breakdown.hasUnpricedChildren)
+                    Card(
+                      margin: const EdgeInsets.only(top: 8, bottom: 4),
+                      color: Theme.of(context).colorScheme.errorContainer,
+                      child: ListTile(
+                        leading: Icon(
+                          Icons.warning_amber_rounded,
+                          color: Theme.of(context).colorScheme.onErrorContainer,
+                        ),
+                        title: Text(
+                          'Hay niños con tarifa 0.00: se están cobrando '
+                          'gratis. Tocá una noche para ponerles tarifa.',
+                          style: TextStyle(
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onErrorContainer,
+                          ),
                         ),
                       ),
-                      onTap: () => _editDayLine(context, ref, line),
+                    ),
+                  for (final night in breakdown.nights)
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(_formatDate(night.date)),
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Adultos ${quote.adultsCount} × '
+                            '${formatCents(night.adultsRateCents, currency)}',
+                          ),
+                          for (final child in night.children)
+                            Text(
+                              '${child.group.count == 1 ? 'Niño' : 'Niños'} '
+                              '${child.group.count} × '
+                              '${formatCents(child.rateCents, currency)}',
+                            ),
+                        ],
+                      ),
+                      trailing: Text(formatCents(night.totalCents, currency)),
+                      onTap: () => _editNight(
+                        context,
+                        ref,
+                        night,
+                        breakdown.nights.length,
+                      ),
                     ),
                   const Divider(height: 32),
                   Row(
@@ -172,7 +212,7 @@ class QuoteDetailPage extends ConsumerWidget {
                       context,
                       entry,
                       quote,
-                      dayLines,
+                      breakdown,
                       totalCents,
                       balanceCents,
                       currency,
@@ -192,12 +232,8 @@ class QuoteDetailPage extends ConsumerWidget {
                     ),
                     const SizedBox(height: 8),
                     FilledButton(
-                      onPressed: () => _convertToReservation(
-                        context,
-                        ref,
-                        quote,
-                        totalCents,
-                      ),
+                      onPressed: () =>
+                          _convertToReservation(context, ref, quote, breakdown),
                       child: const Text('Convertir en reserva'),
                     ),
                   ] else
@@ -219,7 +255,7 @@ class QuoteDetailPage extends ConsumerWidget {
     ({Quote quote, String propertyName, String? ownerName, String roomName})
     entry,
     Quote quote,
-    List<QuoteDayLine> dayLines,
+    QuoteBreakdown breakdown,
     int totalCents,
     int balanceCents,
     String currency,
@@ -230,9 +266,8 @@ class QuoteDetailPage extends ConsumerWidget {
           propertyName: entry.propertyName,
           roomName: entry.roomName,
           guestName: quote.guestName,
-          dayLines: dayLines,
+          nights: breakdown.nights,
           adultsCount: quote.adultsCount,
-          childrenCount: quote.childrenCount,
           totalCents: totalCents,
           depositCents: quote.depositCents,
           balanceCents: balanceCents,
@@ -269,27 +304,26 @@ class QuoteDetailPage extends ConsumerWidget {
         );
   }
 
-  Future<void> _editDayLine(
+  Future<void> _editNight(
     BuildContext context,
     WidgetRef ref,
-    QuoteDayLine line,
+    QuoteNight night,
+    int nightsCount,
   ) async {
-    final rates = await showDialog<QuoteDayRates>(
+    final edit = await showDialog<QuoteNightEdit>(
       context: context,
-      builder: (_) => EditQuoteDayDialog(
-        date: line.date,
-        adultsRateCents: line.adultsRateCents,
-        childrenRateCents: line.childrenRateCents,
-      ),
+      builder: (_) =>
+          EditQuoteDayDialog(night: night, nightsCount: nightsCount),
     );
-    if (rates == null) return;
+    if (edit == null) return;
 
     await ref
         .read(quoteRepositoryProvider)
-        .updateDayLine(
-          line.id,
-          adultsRateCents: rates.adultsRateCents,
-          childrenRateCents: rates.childrenRateCents,
+        .updateNight(
+          night.line,
+          adultsRateCents: edit.adultsRateCents,
+          childRatesByGroupId: edit.childRatesByGroupId,
+          applyChildRatesToAllNights: edit.applyChildRatesToAllNights,
         );
   }
 
@@ -339,7 +373,7 @@ class QuoteDetailPage extends ConsumerWidget {
     BuildContext context,
     WidgetRef ref,
     Quote quote,
-    int totalCents,
+    QuoteBreakdown breakdown,
   ) async {
     final data = await showDialog<NewGuestData>(
       context: context,
@@ -373,13 +407,13 @@ class QuoteDetailPage extends ConsumerWidget {
             roomAssignments: [
               RoomAssignmentInput(
                 roomId: quote.roomId,
-                guestsCount: quote.adultsCount + quote.childrenCount,
+                guestsCount: quote.adultsCount + breakdown.childrenCount,
               ),
             ],
           );
       await ref
           .read(reservationRepositoryProvider)
-          .overrideTotalPrice(reservationId, totalCents);
+          .overrideTotalPrice(reservationId, breakdown.totalCents);
       if (quote.notes != null) {
         await ref
             .read(reservationRepositoryProvider)

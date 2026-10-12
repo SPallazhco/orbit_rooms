@@ -7,6 +7,7 @@ import 'package:orbit_rooms/features/rooms/rooms_providers.dart';
 import 'data/payment_repository.dart';
 import 'data/reservation_repository.dart';
 import 'data/vehicle_repository.dart';
+import 'domain/reservation_timeline.dart';
 import 'domain/usecases/create_reservation_use_case.dart';
 import 'domain/usecases/register_payment_use_case.dart';
 
@@ -110,3 +111,72 @@ final reservationDetailProvider =
         vehicles: vehicles,
       );
     });
+
+typedef ReservationListItem = ({
+  Reservation reservation,
+  String guestName,
+  String roomNames,
+  int guestsCount,
+  int paidCents,
+  ReservationPhase phase,
+});
+
+/// Cada reserva con lo que la lista necesita para decidir de un vistazo:
+/// habitaciones, personas, cuánto se cobró y en qué fase está. Provider
+/// derivado (mismo patrón que Dashboard): sin consulta SQL nueva.
+final reservationListProvider = Provider<AsyncValue<List<ReservationListItem>>>(
+  (ref) {
+    final reservationsAsync = ref.watch(reservationsProvider);
+    final assignmentsAsync = ref.watch(reservationRoomAssignmentsProvider);
+    final roomsAsync = ref.watch(activeRoomsProvider);
+    final paymentsAsync = ref.watch(paymentsProvider);
+
+    if (reservationsAsync.isLoading ||
+        assignmentsAsync.isLoading ||
+        roomsAsync.isLoading ||
+        paymentsAsync.isLoading) {
+      return const AsyncValue.loading();
+    }
+    final error =
+        reservationsAsync.error ??
+        assignmentsAsync.error ??
+        roomsAsync.error ??
+        paymentsAsync.error;
+    if (error != null) return AsyncValue.error(error, StackTrace.current);
+
+    final roomNameById = {
+      for (final entry in roomsAsync.value!) entry.room.id: entry.room.name,
+    };
+    final linesByReservation = <String, List<ReservationRoom>>{};
+    for (final a in assignmentsAsync.value!) {
+      linesByReservation.putIfAbsent(a.reservation.id, () => []).add(a.line);
+    }
+    final paidByReservation = <String, int>{};
+    for (final p in paymentsAsync.value!) {
+      paidByReservation.update(
+        p.reservationId,
+        (sum) => sum + p.amountCents,
+        ifAbsent: () => p.amountCents,
+      );
+    }
+
+    final now = DateTime.now();
+    return AsyncValue.data([
+      for (final entry in reservationsAsync.value!)
+        (
+          reservation: entry.reservation,
+          guestName: entry.guestName,
+          roomNames: (linesByReservation[entry.reservation.id] ?? [])
+              .map((l) => roomNameById[l.roomId])
+              .whereType<String>()
+              .join(', '),
+          guestsCount: (linesByReservation[entry.reservation.id] ?? []).fold(
+            0,
+            (sum, l) => sum + l.guestsCount,
+          ),
+          paidCents: paidByReservation[entry.reservation.id] ?? 0,
+          phase: reservationPhase(entry.reservation, now),
+        ),
+    ]);
+  },
+);

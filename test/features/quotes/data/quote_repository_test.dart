@@ -3,6 +3,7 @@ import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:orbit_rooms/core/database/app_database.dart';
 import 'package:orbit_rooms/features/quotes/data/quote_repository.dart';
+import 'package:orbit_rooms/features/quotes/domain/quote_pricing.dart';
 import 'package:uuid/uuid.dart';
 
 void main() {
@@ -50,15 +51,16 @@ void main() {
 
   tearDown(() => db.close());
 
-  test('create arma una línea por noche con la tarifa de la habitación, niños '
-      'en 0, y un depósito sugerido de la mitad del total', () async {
+  test('create arma una línea por noche con la tarifa de la habitación, un '
+      'grupo de niños por tarifa repetido en cada noche, y un depósito '
+      'sugerido de la mitad del total', () async {
     final quoteId = await repository.create(
       propertyId: propertyId,
       roomId: roomId,
       checkInDate: checkIn,
       checkOutDate: checkOut,
       adultsCount: 3,
-      childrenCount: 1,
+      childGroups: [(count: 3, rateCents: 700), (count: 1, rateCents: 500)],
       guestName: 'Ana',
     );
 
@@ -66,15 +68,40 @@ void main() {
     // jueves (1200) + viernes (1500) = dos noches.
     expect(dayLines, hasLength(2));
     expect(dayLines[0].adultsRateCents, 1200);
-    expect(dayLines[0].childrenRateCents, 0);
     expect(dayLines[1].adultsRateCents, 1500);
+
+    final groups = await repository.watchChildGroups(quoteId).first;
+    expect(groups.map((g) => g.count), [3, 1]);
+    final rates = await repository.watchChildRates(quoteId).first;
+    expect(rates, hasLength(4));
+    expect(
+      rates.where((r) => r.groupId == groups[0].id).map((r) => r.rateCents),
+      [700, 700],
+    );
+    expect(
+      rates.where((r) => r.groupId == groups[1].id).map((r) => r.rateCents),
+      [500, 500],
+    );
 
     final quote = await repository.getById(quoteId);
     expect(quote.status, QuoteStatus.pending);
     expect(quote.adultsCount, 3);
-    expect(quote.childrenCount, 1);
-    // total = (1200+1500)*3 adultos = 8100; depósito sugerido = mitad.
-    expect(quote.depositCents, 4050);
+    // adultos (1200+1500)*3 = 8100 + niños (3*700 + 1*500)*2 noches = 5200
+    // → total 13300; depósito sugerido = mitad.
+    expect(quote.depositCents, 6650);
+  });
+
+  test('sin niños no se crea ningún grupo', () async {
+    final quoteId = await repository.create(
+      propertyId: propertyId,
+      roomId: roomId,
+      checkInDate: checkIn,
+      checkOutDate: checkOut,
+      adultsCount: 2,
+    );
+
+    expect(await repository.watchChildGroups(quoteId).first, isEmpty);
+    expect(await repository.watchChildRates(quoteId).first, isEmpty);
   });
 
   test('watchAll se actualiza solo al crear una cotización y trae nombre de '
@@ -103,54 +130,65 @@ void main() {
     expect(emissions, [0, 1]);
   });
 
-  test('updateDayLine edita una noche puntual (ej. descuento de niño) sin '
-      'tocar las demás', () async {
+  test('updateNight edita una noche puntual (adulto y cada grupo de niños) '
+      'sin tocar las demás', () async {
     final quoteId = await repository.create(
       propertyId: propertyId,
       roomId: roomId,
       checkInDate: checkIn,
       checkOutDate: checkOut,
       adultsCount: 3,
-      childrenCount: 1,
+      childGroups: [(count: 3, rateCents: 700), (count: 1, rateCents: 500)],
     );
-
     final dayLines = await repository.watchDayLines(quoteId).first;
-    await repository.updateDayLine(
-      dayLines[1].id,
-      adultsRateCents: dayLines[1].adultsRateCents,
-      childrenRateCents: 700,
+    final groups = await repository.watchChildGroups(quoteId).first;
+
+    await repository.updateNight(
+      dayLines[1],
+      adultsRateCents: 1800,
+      childRatesByGroupId: {groups[0].id: 900, groups[1].id: 600},
     );
 
-    final updated = await repository.watchDayLines(quoteId).first;
-    expect(updated[0].childrenRateCents, 0);
-    expect(updated[1].childrenRateCents, 700);
+    final updatedLines = await repository.watchDayLines(quoteId).first;
+    expect(updatedLines.map((l) => l.adultsRateCents), [1200, 1800]);
+
+    final breakdown = buildQuoteBreakdown(
+      adultsCount: 3,
+      dayLines: updatedLines,
+      groups: groups,
+      rates: await repository.watchChildRates(quoteId).first,
+    );
+    expect(breakdown.nights[0].children.map((c) => c.rateCents), [700, 500]);
+    expect(breakdown.nights[1].children.map((c) => c.rateCents), [900, 600]);
+    // noche 1: 1200*3 + 3*700 + 1*500 = 6200
+    // noche 2: 1800*3 + 3*900 + 1*600 = 8700
+    expect(breakdown.totalCents, 14900);
   });
 
-  test('totalCentsFor suma adultos y niños por línea', () async {
+  test('updateNight con applyChildRatesToAllNights copia las tarifas de niños '
+      'a todas las noches pero no la de adulto', () async {
     final quoteId = await repository.create(
       propertyId: propertyId,
       roomId: roomId,
       checkInDate: checkIn,
       checkOutDate: checkOut,
-      adultsCount: 3,
-      childrenCount: 1,
+      adultsCount: 2,
+      childGroups: [(count: 2, rateCents: 0)],
     );
     final dayLines = await repository.watchDayLines(quoteId).first;
-    await repository.updateDayLine(
-      dayLines[1].id,
-      adultsRateCents: dayLines[1].adultsRateCents,
-      childrenRateCents: 700,
-    );
-    final updated = await repository.watchDayLines(quoteId).first;
+    final groups = await repository.watchChildGroups(quoteId).first;
 
-    final total = repository.totalCentsFor(
-      updated,
-      adultsCount: 3,
-      childrenCount: 1,
+    await repository.updateNight(
+      dayLines[0],
+      adultsRateCents: dayLines[0].adultsRateCents,
+      childRatesByGroupId: {groups.single.id: 800},
+      applyChildRatesToAllNights: true,
     );
 
-    // (1200*3 + 0*1) + (1500*3 + 700*1) = 3600 + 5200 = 8800
-    expect(total, 8800);
+    final rates = await repository.watchChildRates(quoteId).first;
+    expect(rates.map((r) => r.rateCents), [800, 800]);
+    final lines = await repository.watchDayLines(quoteId).first;
+    expect(lines.map((l) => l.adultsRateCents), [1200, 1500]);
   });
 
   test(

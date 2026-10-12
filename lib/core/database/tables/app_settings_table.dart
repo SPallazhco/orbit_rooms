@@ -8,6 +8,10 @@ class AppSettings extends Table {
   /// cotización pendiente (PRD 5.4 extendido — ver docs/DECISIONS.md).
   IntColumn get quoteReminderDays => integer().withDefault(const Constant(3))();
 
+  /// Texto del mensaje de recordatorio con variables (`{nombre}`, `{casa}`,
+  /// ...). `null` = se usa el mensaje original de la app.
+  TextColumn get reminderMessageTemplate => text().nullable()();
+
   @override
   Set<Column> get primaryKey => {id};
 }

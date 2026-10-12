@@ -3,6 +3,8 @@ import 'package:orbit_rooms/core/database/app_database.dart';
 import 'package:orbit_rooms/features/reservations/domain/reservation_pricing.dart';
 import 'package:uuid/uuid.dart';
 
+typedef ChildGroupInput = ({int count, int rateCents});
+
 class QuoteRepository {
   QuoteRepository(this._db);
 
@@ -10,17 +12,18 @@ class QuoteRepository {
 
   /// Arma una línea por noche con la tarifa de la habitación (entre
   /// semana/fin de semana/feriado — misma regla que
-  /// `ReservationRepository.createGroupReservation`), la de niños en 0
-  /// (la administradora la decide caso a caso, sin default real, ver
-  /// docs/DECISIONS.md). El depósito sugerido es la mitad del total,
-  /// editable después.
+  /// `ReservationRepository.createGroupReservation`). Cada grupo de niños
+  /// parte con la misma tarifa en todas las noches (la que se tipeó al
+  /// cotizar), después se ajusta noche por noche — la administradora la
+  /// decide caso a caso, ver docs/DECISIONS.md. El depósito sugerido es la
+  /// mitad del total, editable después.
   Future<String> create({
     required String propertyId,
     required String roomId,
     required DateTime checkInDate,
     required DateTime checkOutDate,
     required int adultsCount,
-    int childrenCount = 0,
+    List<ChildGroupInput> childGroups = const [],
     String? guestName,
     String? guestContact,
     String? notes,
@@ -41,9 +44,13 @@ class QuoteRepository {
       holidayDates: holidayDates,
     );
 
+    final childrenPerNightCents = childGroups.fold(
+      0,
+      (sum, g) => sum + g.rateCents * g.count,
+    );
     final totalCents = dayRates.fold(
       0,
-      (sum, day) => sum + day.rateCents * adultsCount,
+      (sum, day) => sum + day.rateCents * adultsCount + childrenPerNightCents,
     );
 
     final quoteId = const Uuid().v4();
@@ -58,7 +65,6 @@ class QuoteRepository {
               checkInDate: checkInDate,
               checkOutDate: checkOutDate,
               adultsCount: adultsCount,
-              childrenCount: Value(childrenCount),
               depositCents: (totalCents / 2).round(),
               guestName: Value(guestName),
               guestContact: Value(guestContact),
@@ -77,6 +83,31 @@ class QuoteRepository {
                 adultsRateCents: day.rateCents,
               ),
             );
+      }
+
+      for (var i = 0; i < childGroups.length; i++) {
+        final groupId = const Uuid().v4();
+        await _db
+            .into(_db.quoteChildGroups)
+            .insert(
+              QuoteChildGroupsCompanion.insert(
+                id: Value(groupId),
+                quoteId: quoteId,
+                count: childGroups[i].count,
+                sortOrder: Value(i),
+              ),
+            );
+        for (final day in dayRates) {
+          await _db
+              .into(_db.quoteChildRates)
+              .insert(
+                QuoteChildRatesCompanion.insert(
+                  groupId: groupId,
+                  date: day.date,
+                  rateCents: Value(childGroups[i].rateCents),
+                ),
+              );
+        }
       }
     });
 
@@ -127,16 +158,85 @@ class QuoteRepository {
             ..orderBy([(l) => OrderingTerm.asc(l.date)]))
           .watch();
 
-  Future<void> updateDayLine(
-    String id, {
+  /// Para la lista de cotizaciones: totales y conteo de niños de todas las
+  /// cotizaciones de una vez (ver `quoteSummariesProvider`).
+  Stream<List<QuoteDayLine>> watchAllDayLines() =>
+      _db.select(_db.quoteDayLines).watch();
+
+  Stream<List<QuoteChildGroup>> watchAllChildGroups() =>
+      _db.select(_db.quoteChildGroups).watch();
+
+  Stream<List<QuoteChildRate>> watchAllChildRates() =>
+      _db.select(_db.quoteChildRates).watch();
+
+  Stream<List<QuoteChildGroup>> watchChildGroups(String quoteId) =>
+      (_db.select(_db.quoteChildGroups)
+            ..where((g) => g.quoteId.equals(quoteId))
+            ..orderBy([(g) => OrderingTerm.asc(g.sortOrder)]))
+          .watch();
+
+  Stream<List<QuoteChildRate>> watchChildRates(String quoteId) {
+    final query = _db.select(_db.quoteChildRates).join([
+      innerJoin(
+        _db.quoteChildGroups,
+        _db.quoteChildGroups.id.equalsExp(_db.quoteChildRates.groupId),
+      ),
+    ])..where(_db.quoteChildGroups.quoteId.equals(quoteId));
+
+    return query.watch().map(
+      (rows) => rows.map((row) => row.readTable(_db.quoteChildRates)).toList(),
+    );
+  }
+
+  /// Edita una noche puntual: la tarifa de adulto y la de cada grupo de
+  /// niños (`childRatesByGroupId`). Con [applyChildRatesToAllNights] las
+  /// tarifas de niños se copian a todas las noches de la cotización — la
+  /// de adulto no, porque varía sola con feriados y fines de semana.
+  Future<void> updateNight(
+    QuoteDayLine line, {
     required int adultsRateCents,
-    required int childrenRateCents,
-  }) => (_db.update(_db.quoteDayLines)..where((l) => l.id.equals(id))).write(
-    QuoteDayLinesCompanion(
-      adultsRateCents: Value(adultsRateCents),
-      childrenRateCents: Value(childrenRateCents),
-    ),
-  );
+    required Map<String, int> childRatesByGroupId,
+    bool applyChildRatesToAllNights = false,
+  }) => _db.transaction(() async {
+    await (_db.update(_db.quoteDayLines)..where((l) => l.id.equals(line.id)))
+        .write(QuoteDayLinesCompanion(adultsRateCents: Value(adultsRateCents)));
+
+    final dates = applyChildRatesToAllNights
+        ? (await (_db.select(
+            _db.quoteDayLines,
+          )..where((l) => l.quoteId.equals(line.quoteId))).get()).map(
+            (l) => l.date,
+          )
+        : [line.date];
+
+    for (final date in dates) {
+      for (final entry in childRatesByGroupId.entries) {
+        await _setChildRate(entry.key, date, entry.value);
+      }
+    }
+  });
+
+  Future<void> _setChildRate(
+    String groupId,
+    DateTime date,
+    int rateCents,
+  ) async {
+    final updated =
+        await (_db.update(_db.quoteChildRates)
+              ..where((r) => r.groupId.equals(groupId) & r.date.equals(date)))
+            .write(QuoteChildRatesCompanion(rateCents: Value(rateCents)));
+    if (updated == 0) {
+      await _db
+          .into(_db.quoteChildRates)
+          .insert(
+            QuoteChildRatesCompanion.insert(
+              groupId: groupId,
+              date: date,
+              rateCents: Value(rateCents),
+            ),
+          );
+    }
+  }
 
   Future<void> updateGuestInfo(
     String id, {
@@ -151,20 +251,14 @@ class QuoteRepository {
     ),
   );
 
-  Future<void> updateCounts(
-    String id, {
-    required int adultsCount,
-    required int childrenCount,
-  }) => (_db.update(_db.quotes)..where((q) => q.id.equals(id))).write(
-    QuotesCompanion(
-      adultsCount: Value(adultsCount),
-      childrenCount: Value(childrenCount),
-    ),
-  );
-
   Future<void> updateDeposit(String id, int depositCents) =>
       (_db.update(_db.quotes)..where((q) => q.id.equals(id))).write(
         QuotesCompanion(depositCents: Value(depositCents)),
+      );
+
+  Future<void> markReminderSent(String id, DateTime at) =>
+      (_db.update(_db.quotes)..where((q) => q.id.equals(id))).write(
+        QuotesCompanion(reminderSentAt: Value(at)),
       );
 
   Future<void> updateStatus(String id, QuoteStatus status) =>
@@ -179,18 +273,4 @@ class QuoteRepository {
           reservationId: Value(reservationId),
         ),
       );
-
-  /// Función pura (no toca la base de datos): el total no se guarda como
-  /// columna para no desincronizarse si se edita una línea después.
-  int totalCentsFor(
-    List<QuoteDayLine> dayLines, {
-    required int adultsCount,
-    required int childrenCount,
-  }) => dayLines.fold(
-    0,
-    (sum, line) =>
-        sum +
-        line.adultsRateCents * adultsCount +
-        line.childrenRateCents * childrenCount,
-  );
 }

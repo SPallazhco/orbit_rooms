@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:orbit_rooms/features/guests/guests_providers.dart';
 import 'package:orbit_rooms/features/guests/presentation/pages/guest_detail_page.dart';
 import 'package:orbit_rooms/features/guests/presentation/widgets/add_guest_dialog.dart';
+import 'package:orbit_rooms/features/quotes/presentation/widgets/reminders_bell.dart';
 import 'package:orbit_rooms/shared/widgets/app_drawer.dart';
 
 class GuestsPage extends ConsumerStatefulWidget {
@@ -20,7 +21,10 @@ class _GuestsPageState extends ConsumerState<GuestsPage> {
     final guestsAsync = ref.watch(guestsProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Huéspedes')),
+      appBar: AppBar(
+        title: const Text('Huéspedes'),
+        actions: const [RemindersBell()],
+      ),
       drawer: AppDrawer(),
       body: Column(
         children: [

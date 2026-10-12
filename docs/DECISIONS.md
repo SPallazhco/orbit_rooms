@@ -1694,3 +1694,240 @@ cotización de una propiedad sin `ownerName` (sí muestra el logo),
 confirmando que `showBrand` responde a los datos reales y no a una
 propiedad hardcodeada. Compartir genera una imagen PNG válida en ambos
 casos, sin errores de layout en consola.
+
+## 2026-10-09 — Rediseño del Dashboard
+
+**Contexto:** el Dashboard era una lista plana de textos ("2 / 10
+habitaciones ocupadas", nombres sueltos de huéspedes). A pedido del
+usuario se rediseñó para ser más visual y más útil de un vistazo.
+
+**Decisiones:**
+- **Dona dibujada con `CustomPaint`, sin paquete de gráficos.** Es un solo
+  valor (ocupadas / total) sobre un anillo de fondo; `fl_chart` o similar
+  sería una dependencia para un solo arco (mismo criterio de "no agregar
+  piezas porque sí"). Se anima con `TweenAnimationBuilder` y usa el
+  `colorScheme` del tema, así que respeta modo oscuro (a diferencia de las
+  tarjetas para compartir, que usan colores fijos).
+- **Sigue siendo un provider derivado, no una consulta nueva.**
+  `dashboardDataProvider` ahora también combina `quotesProvider` (para el
+  conteo de cotizaciones pendientes). Los check-ins/outs pasaron de
+  `({reservation, guestName})` a `DashboardMovement` con `roomNames`,
+  `guestsCount` y `balanceCents` (total − pagos), calculados con los
+  mismos providers ya cargados.
+- **Barras por propiedad solo si hay más de una activa:** con una sola
+  propiedad repetirían exactamente lo que ya dice la dona.
+- **Huéspedes hospedados** = suma de `ReservationRoom.guestsCount` de las
+  asignaciones activas ahora (misma regla que "habitación ocupada").
+- **Regla heredada, no cambiada:** una habitación con check-out hoy deja
+  de contarse como ocupada desde las 00:00 del día (las fechas son sin
+  hora; el check-out fijo de las 11:00 no se modela en el cálculo).
+- Se usa verde fijo (no un color del tema) para el chip "Pagado": con la
+  semilla actual `tertiary` es rosa y se leía como error.
+
+**Estado:** vigente. Test de contenedor ampliado
+(`dashboard_providers_test.dart`) y probado a mano en simulador con
+reservas de hoy (llegada con saldo, salida pagada, estadía en curso).
+
+## 2026-10-09 — Pantalla de Reportes: solo garaje y comisión, rediseñada
+
+**Contexto:** el usuario pidió que `ReportsPage` sea usable y atractiva:
+el reporte de ocupación/ingresos ya no aporta (el Dashboard lo cubre) y
+garaje + comisión son "el corazón de la app" hoy.
+
+**Decisiones:**
+- **Se eliminó el reporte de ocupación/ingresos por rango**, incluido
+  `reportDataProvider`/`ReportData` y su test — no se deja código muerto
+  "por si acaso". `DateRange` se conserva (lo usa la UI de comisión).
+- **La página es solo composición:** `GarageReportSection` y
+  `CommissionReportSection` (cada una `ConsumerStatefulWidget` con su propio
+  estado local) dentro de `ReportSectionCard`; `ReportEmptyState` para los
+  casos sin datos en vez de un botón deshabilitado sin explicación.
+- **Atajos en lugar de pickers como primera opción:** garaje = chips
+  Hoy / Mañana / Otra fecha; comisión = Esta semana / Semana pasada / Este
+  mes / Mes pasado / Otro rango (fila deslizable). Las semanas van de
+  lunes a domingo (así se arma el Excel semanal) y el período por defecto
+  es **Semana pasada**, que es lo que realmente se cobra. Los períodos en
+  curso se cortan en hoy: no se cobra comisión de noches que aún no
+  pasaron.
+- **Resumen antes de compartir:** garaje muestra el conteo y las primeras
+  4 placas (con estilo de placa) en la propia pantalla; comisión muestra
+  el total a cobrar destacado más noches, lo cobrado por la casa y el
+  garaje descontado — la imagen para compartir (`*PreviewPage`/`*Card`) no
+  cambió.
+- **`shared/utils/spanish_dates.dart`** (`formatShortDate`,
+  `formatLongDate`): reemplaza los nombres de día/mes que el Dashboard
+  tenía privados y que Reportes necesitaba también.
+
+**Estado:** vigente. `flutter analyze` limpio, 72 tests en verde (uno menos
+por el reporte eliminado). Probado a mano en simulador con datos reales:
+chips, estados vacíos y resumen de comisión.
+
+## 2026-10-10 — Cotizaciones: grupos de niños con tarifa propia por noche
+
+**Contexto:** la dueña de Shejiná aclaró que la tarifa de niño no es una
+sola: depende del niño (ej. 4 niños, 3 de 8 años pagan 7 y uno de 2 años
+paga 5) y, además, puede variar con feriados/fines de semana. El modelo
+tenía una única `QuoteDayLines.childrenRateCents` × `Quotes.childrenCount`.
+La regla es **a criterio de la usuaria**, no una política fija por edad.
+
+**Alternativas descartadas:**
+- *Una fila por niño con su edad:* lo más preciso, pero obliga a tipear
+  mucho para ganar poco; la edad no se usa para calcular nada.
+- *Tabla fija de tarifas por edad en Configuración:* no existe esa
+  política (es discrecional) — construirla sería una abstracción
+  hipotética. Si más adelante aparece, puede precargar los grupos.
+- *Una tarifa fija por grupo para toda la estadía:* más simple, pero
+  pierde el ajuste noche por noche que ya se había pedido (PRD 5.4).
+
+**Decisión:** dos tablas nuevas (esquema v4):
+`QuoteChildGroups` (`quoteId`, `count`, `sortOrder`) y `QuoteChildRates`
+(`groupId`, `date`, `rateCents`, único por grupo+fecha). Se eliminan
+`Quotes.childrenCount` (ahora es la suma de los grupos) y
+`QuoteDayLines.childrenRateCents` — una sola fuente de verdad.
+- **Migración v3→v4 con datos:** cada cotización con niños pasa a **un
+  solo grupo** con su cantidad y la tarifa que tenía cada noche (no se
+  pierde nada). Probado con test de datos
+  (`quote_children_migration_test.dart`) y sobre la base real del
+  simulador (13 cotizaciones, ej. 2 niños a 10.00 y 7.00 conservados).
+  `dropColumn` requiere SQLite ≥ 3.35 (el motor embebido de Drift lo
+  cumple).
+- **Total siempre derivado:** `buildQuoteBreakdown` (función pura en
+  `features/quotes/domain/quote_pricing.dart`) arma noches → tarifas por
+  grupo → total; `quoteBreakdownProvider` es un provider derivado (mismo
+  patrón que Dashboard). Reemplaza `QuoteRepository.totalCentsFor`.
+- **Crear:** sección "Niños" con filas cantidad + tarifa por noche y "Otra
+  tarifa de niños"; la tarifa tipeada se copia a todas las noches.
+- **Editar una noche:** el diálogo muestra un campo por grupo ("Grupo 1 ·
+  Niños ×3") y la opción "Usar estas tarifas de niños en todas las
+  noches" (solo niños: la de adulto no se copia porque cambia sola con
+  feriados/fin de semana). Valores inválidos ya no se ignoran en silencio:
+  muestran un mensaje.
+- **Advertencia de tarifa 0:** el detalle avisa "Hay niños con tarifa
+  0.00" — antes, 4 niños a 0.00 se cobraban gratis sin ninguna señal.
+- La imagen para compartir muestra una fila por grupo y noche.
+- Se eliminó `QuoteRepository.updateCounts` (sin ningún llamador en la
+  UI). Sigue pendiente poder **editar** los grupos (cantidades) de una
+  cotización ya creada: hoy se corrige creando otra.
+
+**Estado:** vigente. `flutter analyze` limpio y 80 tests en verde
+(repository, pricing puro, provider derivado, migración con datos).
+Probado a mano en simulador: crear con dos grupos, advertencia de tarifa
+0, diálogo de edición e imagen para compartir.
+
+## 2026-10-10 — Lista de cotizaciones: título por defecto y rediseño UX
+
+**Contexto:** la lista mostraba "Sin nombre todavía" en muchas cotizaciones
+(el nombre es opcional), así que eran indistinguibles entre sí, y no decía
+ni cuánto, ni cuándo llega, ni qué urge. El usuario pidió un título por
+defecto y mejores prácticas de UX.
+
+**Decisiones:**
+- **Título:** `quoteTitle()` (`presentation/quote_title.dart`, función pura
+  con test): `Nombre - 27/10 - 6 adultos, 2 niños`; sin nombre arranca por
+  la fecha; sin niños no los menciona; singular/plural correcto; el año
+  solo si no es el actual. También se usa en el detalle como encabezado
+  cuando no hay nombre (reemplaza "Sin nombre todavía").
+- **Tarjetas en vez de filas planas** (`QuoteCard`): título, casa + habitación,
+  fechas con noches, total destacado, franja y chip de estado, y para las
+  pendientes un chip de urgencia ("Llega hoy", "Llega mañana", "Llega en N
+  días", "Fecha pasada"), en color de alerta con ≤ 3 días.
+- **Prioridad visual por tiempo, no por orden de creación:** las próximas
+  arriba (la más cercana primero) y las de fechas pasadas separadas bajo
+  "Fechas pasadas" (`splitUpcomingAndPast`, con test).
+- **Filtros por estado con contador** (Pendientes · N / Reservadas / Rechazadas
+  / Todas), por defecto *Pendientes*: es lo accionable; los contadores
+  evitan pensar que las otras "desaparecieron". Búsqueda en memoria por
+  nombre/contacto/casa/habitación (mismo criterio que Huéspedes).
+- **Estados vacíos con salida:** sin cotizaciones → ícono + explicación +
+  botón "Crear cotización"; filtro/búsqueda sin resultados → mensaje +
+  "Ver todas". El botón flotante pasó a ser extendido ("Nueva cotización")
+  para que se entienda sin adivinar el ícono.
+- **Totales en la lista sin consulta SQL nueva:** `quoteSummariesProvider`
+  (provider derivado, mismo patrón que Dashboard) arma total y cantidad de
+  niños de todas las cotizaciones a partir de las tres tablas ya
+  existentes (`QuoteRepository.watchAll*`).
+
+**Estado:** vigente. `flutter analyze` limpio y 87 tests en verde. Probado
+a mano en simulador con las cotizaciones reales (Pendientes, Reservadas
+con separador de fechas pasadas, títulos con y sin nombre).
+
+## 2026-10-10 — Campana de avisos y recordatorio por WhatsApp
+
+**Contexto:** la administradora quiere que unos días antes del check-in la
+app le muestre, dentro de la propia app, a quién cotizó y no respondió, y
+poder escribirle con un mensaje que ella pueda personalizar.
+
+**Decisiones de negocio (confirmadas con el usuario):**
+- **Sin API de WhatsApp.** Se comparte con la hoja de compartir del sistema
+  (`share_plus`, ya usado para las imágenes), la usuaria elige el chat y
+  pulsa enviar. Por eso **no** se agregó `url_launcher` ni se asume un
+  código de país (+593) para armar el enlace al chat: el número del
+  contacto se muestra con botón "Copiar" para pegarlo en WhatsApp.
+- **Después de enviar → "Recordada", no desaparece:** baja a una sección
+  gris ("Ya recordadas") y deja de contar en el número de la campana, para
+  no insistir todos los días sin perder la pista de que ya se le escribió.
+  Se guarda en `Quotes.reminderSentAt` (esquema v5). Solo se marca si la
+  hoja de compartir reporta éxito (`ShareResultStatus.success`); si se
+  cancela, no se marca. Hay una salida manual "Ya le escribí por otro
+  medio" (ej. por llamada). Enviar también cancela la notificación del
+  teléfono pendiente de esa cotización.
+- **Ventana:** pendientes con check-in entre hoy y `quoteReminderDays`
+  días (por defecto 3, el mismo ajuste de Configuración — no se agregó
+  un segundo). Al pasar el día del check-in sale de la campana (queda como
+  "Fecha pasada" en la lista de cotizaciones).
+
+**Decisiones técnicas:**
+- **La campana no persiste nada:** `reminderInboxProvider` es un provider
+  derivado de `quotesProvider` + `quoteSummariesProvider` +
+  `quoteReminderDaysProvider` — se vacía sola al reservar/rechazar.
+- **Mensaje con variables** (`domain/reminder_message.dart`, función pura
+  con tests): `{nombre} {casa} {fecha} {personas} {total} {abono}`. Un solo
+  texto global (`AppSettings.reminderMessageTemplate`, `null` = el original
+  de la app); `{casa}` ya distingue entre propiedades. Sin nombre, "Hola
+  {nombre}," queda "Hola,". **Bug que atrapó el test:** `replaceAll` de
+  Dart no soporta `$1` — se usa `replaceAllMapped`.
+- **Editar en el momento sin tocar el texto de siempre:** la pantalla
+  "Recordar al cliente" deja editar el mensaje de esa vez; el texto de
+  siempre se cambia en Configuración → "Mensaje de recordatorio" (chips
+  para insertar variables + vista previa en vivo + "Restaurar el original").
+- La notificación local del teléfono ahora abre directo "Recordar al
+  cliente" (antes el detalle de la cotización).
+- La campana (`RemindersBell`) está en la barra de todas las pantallas
+  principales.
+
+**Estado:** vigente. `flutter analyze` limpio y 96 tests en verde (mensaje
+con variables, provider de la campana, migración v5).
+
+## 2026-10-10 — Lista de reservas: tarjetas, fases y cobro a la vista
+
+**Contexto:** la lista mostraba nombre, fechas, estado y total en una fila
+plana, ordenada por check-in descendente (las más lejanas arriba): lo que
+hay que atender hoy quedaba perdido, y no decía ni quién está en casa ni
+quién debe plata. Mismo criterio que la lista de cotizaciones.
+
+**Decisiones:**
+- **Fase = estado + fechas** (`reservation_timeline.dart`, función pura con
+  tests): *En casa*, *Próxima*, *Pasada*, *Cancelada*. Una reserva que sale
+  hoy sigue *en casa* hasta que se marque el check-out (la ocupación del
+  Dashboard usa fechas sin hora y la deja de contar a las 00:00; acá importa
+  que no desaparezca de "Activas" antes de cobrar/cerrar). Una "confirmada"
+  cuyo check-out ya pasó es *pasada* aunque nadie haya cambiado su estado.
+- **Orden por lo accionable:** en casa (la que sale antes primero), próximas
+  (la más cercana primero), pasadas y canceladas (más recientes primero).
+  Los encabezados de sección solo se muestran cuando hay más de una.
+- **Cobro a la vista:** chip "Pagada" / "Saldo X" / "Sin abono · X". En
+  reservas ya pasadas con saldo el chip va en color de error: es plata por
+  cobrar de una estadía terminada. Las canceladas no muestran cobro.
+- **Filtros con contador**, por defecto *Activas*; búsqueda por huésped o
+  habitación; estados vacíos con acción; FAB extendido. Mismo patrón que
+  Cotizaciones.
+- **Sin consulta nueva:** `reservationListProvider` es un provider derivado
+  (reservas + asignaciones + habitaciones + pagos) que ya existían.
+  Limitación conocida: una habitación desactivada no aparece por nombre
+  (`activeRoomsProvider` solo trae activas).
+- Se agregó `balanceCents()` y se usa el mismo verde fijo del chip "Pagado"
+  del Dashboard.
+
+**Estado:** vigente. Tests: fases y frases de tiempo (puros) y el provider
+derivado.
+

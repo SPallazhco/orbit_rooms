@@ -3,12 +3,23 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:orbit_rooms/core/database/app_database.dart';
 import 'package:orbit_rooms/core/notifications/notification_service.dart';
 import 'package:orbit_rooms/core/settings/settings_providers.dart';
+import 'package:orbit_rooms/features/quotes/data/quote_repository.dart';
 import 'package:orbit_rooms/features/quotes/presentation/pages/quote_detail_page.dart';
 import 'package:orbit_rooms/features/quotes/quotes_providers.dart';
 import 'package:orbit_rooms/features/rooms/rooms_providers.dart';
 
 String _formatDate(DateTime date) =>
     '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
+
+class _ChildGroupFields {
+  final count = TextEditingController(text: '1');
+  final rate = TextEditingController();
+
+  void dispose() {
+    count.dispose();
+    rate.dispose();
+  }
+}
 
 class CreateQuotePage extends ConsumerStatefulWidget {
   const CreateQuotePage({super.key});
@@ -22,7 +33,7 @@ class _CreateQuotePageState extends ConsumerState<CreateQuotePage> {
   DateTime? _checkInDate;
   DateTime? _checkOutDate;
   final _adultsController = TextEditingController(text: '1');
-  final _childrenController = TextEditingController(text: '0');
+  final _childGroups = <_ChildGroupFields>[];
   final _guestNameController = TextEditingController();
   final _guestContactController = TextEditingController();
   bool _saving = false;
@@ -31,7 +42,9 @@ class _CreateQuotePageState extends ConsumerState<CreateQuotePage> {
   @override
   void dispose() {
     _adultsController.dispose();
-    _childrenController.dispose();
+    for (final group in _childGroups) {
+      group.dispose();
+    }
     _guestNameController.dispose();
     _guestContactController.dispose();
     super.dispose();
@@ -76,7 +89,6 @@ class _CreateQuotePageState extends ConsumerState<CreateQuotePage> {
     final checkInDate = _checkInDate;
     final checkOutDate = _checkOutDate;
     final adultsCount = int.tryParse(_adultsController.text) ?? 0;
-    final childrenCount = int.tryParse(_childrenController.text) ?? 0;
 
     if (roomId == null || checkInDate == null || checkOutDate == null) {
       setState(() => _errorMessage = 'Completá habitación y fechas');
@@ -93,6 +105,21 @@ class _CreateQuotePageState extends ConsumerState<CreateQuotePage> {
       return;
     }
 
+    final childGroups = <ChildGroupInput>[];
+    for (final fields in _childGroups) {
+      final count = int.tryParse(fields.count.text) ?? 0;
+      final rateText = fields.rate.text.replaceAll(',', '.').trim();
+      final rate = rateText.isEmpty ? 0.0 : double.tryParse(rateText);
+      if (count <= 0 || rate == null || rate < 0) {
+        setState(
+          () => _errorMessage =
+              'Revisá los niños: cantidad mayor a 0 y una tarifa válida',
+        );
+        return;
+      }
+      childGroups.add((count: count, rateCents: (rate * 100).round()));
+    }
+
     final room = rooms.firstWhere((entry) => entry.room.id == roomId).room;
 
     setState(() => _saving = true);
@@ -106,7 +133,7 @@ class _CreateQuotePageState extends ConsumerState<CreateQuotePage> {
             checkInDate: checkInDate,
             checkOutDate: checkOutDate,
             adultsCount: adultsCount,
-            childrenCount: childrenCount,
+            childGroups: childGroups,
             guestName: guestName,
             guestContact: _emptyToNull(_guestContactController.text),
           );
@@ -190,24 +217,71 @@ class _CreateQuotePageState extends ConsumerState<CreateQuotePage> {
             ],
           ),
           const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _adultsController,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: 'Adultos'),
-                ),
+          TextField(
+            controller: _adultsController,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(labelText: 'Adultos'),
+          ),
+          const SizedBox(height: 20),
+          Text('Niños', style: Theme.of(context).textTheme.titleSmall),
+          const SizedBox(height: 4),
+          Text(
+            _childGroups.isEmpty
+                ? 'Sin niños. Si hay, agregalos por tarifa: los que pagan '
+                      'igual van juntos.'
+                : 'Cada grupo paga su tarifa por noche. Después la podés '
+                      'ajustar noche por noche (feriados, fin de semana).',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+          for (var i = 0; i < _childGroups.length; i++)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    flex: 2,
+                    child: TextField(
+                      controller: _childGroups[i].count,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(labelText: 'Cantidad'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    flex: 3,
+                    child: TextField(
+                      controller: _childGroups[i].rate,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+                      decoration: const InputDecoration(
+                        labelText: 'Tarifa por noche',
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'Quitar',
+                    icon: const Icon(Icons.close),
+                    onPressed: () => setState(() {
+                      _childGroups.removeAt(i).dispose();
+                    }),
+                  ),
+                ],
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: TextField(
-                  controller: _childrenController,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: 'Niños'),
-                ),
+            ),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              onPressed: () =>
+                  setState(() => _childGroups.add(_ChildGroupFields())),
+              icon: const Icon(Icons.add),
+              label: Text(
+                _childGroups.isEmpty ? 'Agregar niños' : 'Otra tarifa de niños',
               ),
-            ],
+            ),
           ),
           const SizedBox(height: 16),
           TextField(

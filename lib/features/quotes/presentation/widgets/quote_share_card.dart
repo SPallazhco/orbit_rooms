@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:orbit_rooms/core/database/app_database.dart';
+import 'package:orbit_rooms/features/quotes/domain/quote_pricing.dart';
 import 'package:orbit_rooms/shared/utils/format_money.dart';
 
 String _formatDate(DateTime d) =>
@@ -20,9 +20,8 @@ class QuoteShareCard extends StatelessWidget {
     required this.propertyName,
     required this.roomName,
     required this.guestName,
-    required this.dayLines,
+    required this.nights,
     required this.adultsCount,
-    required this.childrenCount,
     required this.totalCents,
     required this.depositCents,
     required this.balanceCents,
@@ -34,9 +33,8 @@ class QuoteShareCard extends StatelessWidget {
   final String propertyName;
   final String roomName;
   final String? guestName;
-  final List<QuoteDayLine> dayLines;
+  final List<QuoteNight> nights;
   final int adultsCount;
-  final int childrenCount;
   final int totalCents;
   final int depositCents;
   final int balanceCents;
@@ -205,7 +203,7 @@ class QuoteShareCard extends StatelessWidget {
                         fontSize: 13,
                       ),
                     ),
-                    if (dayLines.isNotEmpty) ...[
+                    if (nights.isNotEmpty) ...[
                       const SizedBox(height: 6),
                       Row(
                         mainAxisSize: MainAxisSize.min,
@@ -217,8 +215,8 @@ class QuoteShareCard extends StatelessWidget {
                           ),
                           const SizedBox(width: 6),
                           Text(
-                            '${_formatDate(dayLines.first.date)}  →  '
-                            '${_formatDate(dayLines.last.date.add(const Duration(days: 1)))}',
+                            '${_formatDate(nights.first.date)}  →  '
+                            '${_formatDate(nights.last.date.add(const Duration(days: 1)))}',
                             style: const TextStyle(
                               color: Colors.black54,
                               fontSize: 12.5,
@@ -270,31 +268,24 @@ class QuoteShareCard extends StatelessWidget {
                             bold: true,
                             fontSize: 12,
                           ),
-                          for (var i = 0; i < dayLines.length; i++) ...[
+                          for (var i = 0; i < nights.length; i++) ...[
                             _dataRow([
-                              _formatShortDate(dayLines[i].date),
-                              formatCents(
-                                dayLines[i].adultsRateCents,
-                                currency,
-                              ),
+                              _formatShortDate(nights[i].date),
+                              formatCents(nights[i].adultsRateCents, currency),
                               '$adultsCount',
                               formatCents(
-                                dayLines[i].adultsRateCents * adultsCount,
+                                nights[i].adultsRateCents * adultsCount,
                                 currency,
                               ),
                             ], background: i.isEven ? Colors.white : _rowAlt),
-                            if (childrenCount > 0)
+                            for (final child in nights[i].children)
                               _dataRow(
                                 [
-                                  'niños',
+                                  child.group.count == 1 ? 'niño' : 'niños',
+                                  formatCents(child.rateCents, currency),
+                                  '${child.group.count}',
                                   formatCents(
-                                    dayLines[i].childrenRateCents,
-                                    currency,
-                                  ),
-                                  '$childrenCount',
-                                  formatCents(
-                                    dayLines[i].childrenRateCents *
-                                        childrenCount,
+                                    child.rateCents * child.group.count,
                                     currency,
                                   ),
                                 ],
